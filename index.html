@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>𝐘𝐀𝐍 — Discord Bot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root, .dark {
+    box-sizing: border-box;
+    --fg: #ffffff; --bg: #000000; --mut: #a3a3a3; --line: #2a2a2a; --card: #0b0b0b;
+  }
+  :root {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .light { --fg: #000000; --bg: #ffffff; --mut: #525252; --line: #dcdcdc; --card: #f7f7f7; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); scroll-behavior: smooth; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #000; color: #fff;
+    font-family: "STIX Two Text", "Times New Roman", Times, serif; font-weight: 700; font-size: 18px; line-height: 1.5;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 22px; }
+  [hidden] { display: none !important; }
+
+  /* ---------- custom star cursor ---------- */
+  html.cursor-on, html.cursor-on * { cursor: none !important; }
+  #cursor { position: fixed; inset: 0; pointer-events: none; z-index: 99999; mix-blend-mode: difference; opacity: 0; transition: opacity .2s; }
+  #cursor .star { position: absolute; left: 0; top: 0; will-change: transform; }
+
+  /* ---------- nav ---------- */
+  nav { position: relative; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .logo { display: flex; align-items: center; gap: 10px; font-size: 26px; letter-spacing: 2px; }
+  .logo svg { width: 22px; height: 22px; }
+  .links { display: flex; align-items: center; gap: 22px; font-size: 17px; }
+  .links a.t { color: var(--mut); } .links a.t:hover { color: var(--fg); }
+  .chip { display: inline-flex; align-items: center; gap: 8px; color: var(--mut); font-size: 16px; }
+  .chip .av { width: 28px; height: 28px; font-size: 14px; }
+
+  /* ---------- buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+    background: var(--fg); color: var(--bg); border: 2px solid var(--fg);
+    padding: 13px 26px; border-radius: 999px; font-size: 18px; transition: transform .15s ease, opacity .15s ease;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn.ghost { background: transparent; color: var(--fg); }
+  .btn.small { padding: 7px 16px; font-size: 15px; }
+  .btn.danger { background: transparent; color: var(--fg); border-color: var(--line); }
+  .btn[aria-disabled="true"] { opacity: .5; }
+
+  /* ---------- hero ---------- */
+  .hero {
+    text-align: center; padding: 84px 0 84px; background: #000;
+    background-image: radial-gradient(rgba(255,255,255,.16) 1px, transparent 1px); background-size: 30px 30px;
+  }
+  .pill { display: inline-block; border: 2px solid var(--line); border-radius: 999px; padding: 5px 16px; font-size: 15px; color: var(--mut); margin-bottom: 22px; background: #000; }
+  h1 { font-size: clamp(64px, 16vw, 168px); line-height: 1; margin: 0 0 14px; letter-spacing: 6px; }
+  .sub { color: var(--mut); font-size: clamp(18px, 2.4vw, 22px); max-width: 620px; margin: 0 auto 34px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .note { color: var(--mut); font-size: 15px; margin-top: 16px; }
+
+  /* ---------- sections ---------- */
+  .sec { background: var(--bg); color: var(--fg); padding: 72px 0; }
+  .sec.dark { border-top: 1px solid var(--line); }
+  h2 { font-size: clamp(30px, 5vw, 46px); margin: 0 0 10px; letter-spacing: 1px; line-height: 1.1; }
+  .lead { color: var(--mut); margin: 0 0 34px; max-width: 640px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; }
+  .card { background: var(--card); color: var(--fg); border: 2px solid var(--line); border-radius: 18px; padding: 24px; transition: border-color .2s; }
+  .card:hover { border-color: var(--fg); }
+  .card .ic { font-size: 26px; margin-bottom: 8px; }
+  .card h3 { margin: 0 0 6px; font-size: 22px; }
+  .card p { margin: 0; color: var(--mut); font-size: 17px; }
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+  .num { width: 42px; height: 42px; border-radius: 50%; background: var(--fg); color: var(--bg); display: grid; place-items: center; font-size: 20px; margin-bottom: 12px; }
+  .step h3 { margin: 0 0 4px; font-size: 22px; } .step p { margin: 0; color: var(--mut); font-size: 17px; }
+  .group { margin-bottom: 26px; }
+  .group h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: var(--mut); }
+  .cmds { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cmd { border: 2px solid var(--line); border-radius: 10px; padding: 4px 12px; font-size: 16px; background: var(--card); }
+  .final .box { border: 2px solid var(--line); border-radius: 28px; padding: 64px 20px; text-align: center; }
+  footer { text-align: center; color: var(--mut); font-size: 15px; padding: 30px 0 40px; background: #000; border-top: 1px solid var(--line); }
+
+  /* ---------- login ---------- */
+  .center { min-height: 60vh; display: grid; place-items: center; padding: 40px 0; }
+  .login { max-width: 440px; width: 100%; text-align: center; padding: 40px 28px; }
+  .login h2 { font-size: 34px; }
+
+  /* ---------- dashboard ---------- */
+  .dash { padding-top: 10px; padding-bottom: 60px; }
+  .banner { border: 2px dashed var(--line); border-radius: 14px; padding: 10px 16px; color: var(--mut); font-size: 15px; margin-bottom: 24px; }
+  .dash h2 { font-size: 34px; }
+  .guild { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .gl { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .av { width: 46px; height: 46px; flex: none; border-radius: 50%; background: var(--fg); color: var(--bg); display: grid; place-items: center; font-size: 20px; }
+  .gname { font-size: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .muted { color: var(--mut); font-size: 15px; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat b { display: block; font-size: 32px; line-height: 1.1; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  select {
+    width: 100%; padding: 11px 12px; border-radius: 12px; background: #000; color: #fff; border: 2px solid var(--line);
+    margin: 10px 0 14px; font-size: 17px;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .status { display: inline-block; padding: 2px 12px; border-radius: 999px; border: 2px solid var(--line); font-size: 14px; color: var(--mut); }
+  .status.on { border-color: #fff; color: #fff; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid var(--line); font-size: 16px; }
+  th { color: var(--mut); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
+  .tscroll { overflow-x: auto; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px);
+    background: #fff; color: #000; padding: 12px 22px; border-radius: 999px; opacity: 0; pointer-events: none;
+    transition: all .25s ease; z-index: 9000; font-size: 16px;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 640px) { .links .hide { display: none; } .hero { padding: 48px 0; } }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn:hover { transform: none; } }
+</style>
+</head>
+<body>
+<div id="cursor" aria-hidden="true"></div>
+<div id="toast" class="toast" role="status"></div>
+
+<div class="wrap"><nav id="nav"></nav></div>
+
+<!-- ================= LANDING ================= -->
+<div id="view-landing">
+  <header class="hero" id="top">
+    <div class="wrap">
+      <div class="pill">★ Free moderation bot for Discord</div>
+      <h1 aria-label="YAN">𝐘𝐀𝐍</h1>
+      <p class="sub">Moderation, warnings, logs, and a bot that stays in your voice channel 24/7. Add it, log in, and manage everything from one place.</p>
+      <div class="cta">
+        <a class="btn inviteLink" href="#" target="_blank" rel="noopener">★ Add to Discord</a>
+        <a class="btn ghost loginLink" href="#/login">Login to Dashboard</a>
+      </div>
+      <div class="note">Step 1: add the bot. Step 2: log in to open your dashboard.</div>
+    </div>
+  </header>
+
+  <section class="sec light" id="features">
+    <div class="wrap">
+      <h2>Everything a server needs</h2>
+      <p class="lead">Simple slash commands with permission checks built in, so nobody can abuse them.</p>
+      <div class="grid">
+        <div class="card"><div class="ic">★</div><h3>Moderation</h3><p>Kick, ban, unban, timeout, purge, lock channels, and set slowmode.</p></div>
+        <div class="card"><div class="ic">★</div><h3>Warning system</h3><p>Warn members, view history, remove one warning, or clear all. Members get a DM.</p></div>
+        <div class="card"><div class="ic">★</div><h3>Mod logs</h3><p>Send every kick, ban, timeout, and warning to the channel you choose.</p></div>
+        <div class="card"><div class="ic">★</div><h3>24/7 voice</h3><p>Run /join once and the bot stays, even after a restart. Works in every server.</p></div>
+        <div class="card"><div class="ic">★</div><h3>Safe by design</h3><p>Role checks stop moderators from acting on people above them.</p></div>
+        <div class="card"><div class="ic">★</div><h3>Web dashboard</h3><p>Manage logs, voice, and warnings from your browser after logging in.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec dark" id="how">
+    <div class="wrap">
+      <h2>Ready in a minute</h2>
+      <p class="lead">No setup files. No complicated config.</p>
+      <div class="steps">
+        <div class="step"><div class="num">1</div><h3>Add the bot</h3><p>Press Add to Discord and pick your server.</p></div>
+        <div class="step"><div class="num">2</div><h3>Move the role up</h3><p>Drag the bot's role above the roles it should moderate.</p></div>
+        <div class="step"><div class="num">3</div><h3>Log in</h3><p>Open the dashboard with Discord and set your logs and voice channel.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec light" id="commands">
+    <div class="wrap">
+      <h2>Commands</h2>
+      <p class="lead">Moderation commands only show for people with the right permissions.</p>
+      <div class="group"><h3>Moderation</h3><div class="cmds">
+        <span class="cmd">/kick</span><span class="cmd">/ban</span><span class="cmd">/unban</span><span class="cmd">/timeout</span><span class="cmd">/untimeout</span>
+        <span class="cmd">/warn</span><span class="cmd">/warnings</span><span class="cmd">/unwarn</span><span class="cmd">/clearwarnings</span>
+        <span class="cmd">/purge</span><span class="cmd">/slowmode</span><span class="cmd">/lock</span><span class="cmd">/unlock</span>
+        <span class="cmd">/nick</span><span class="cmd">/addrole</span><span class="cmd">/removerole</span><span class="cmd">/setlogs</span>
+      </div></div>
+      <div class="group"><h3>Voice</h3><div class="cmds"><span class="cmd">/join</span><span class="cmd">/leave</span></div></div>
+      <div class="group"><h3>Info &amp; fun</h3><div class="cmds">
+        <span class="cmd">/ping</span><span class="cmd">/avatar</span><span class="cmd">/userinfo</span><span class="cmd">/serverinfo</span>
+        <span class="cmd">/8ball</span><span class="cmd">/coinflip</span><span class="cmd">/roll</span><span class="cmd">/say</span><span class="cmd">/help</span>
+      </div></div>
+    </div>
+  </section>
+
+  <section class="sec dark final">
+    <div class="wrap"><div class="box">
+      <h2>Add 𝐘𝐀𝐍 to your server</h2>
+      <p class="lead" style="margin:0 auto 26px">Free, fast, and built for moderators.</p>
+      <a class="btn inviteLink" href="#" target="_blank" rel="noopener">★ Add to Discord</a>
+    </div></div>
+  </section>
+</div>
+
+<!-- ================= LOGIN ================= -->
+<div id="view-login" hidden>
+  <div class="wrap center">
+    <div class="card login">
+      <h2>Login</h2>
+      <p class="lead" style="margin:0 auto 24px">Sign in with Discord to see the servers you manage.</p>
+      <button class="btn" data-action="demo-login">Login with Discord</button>
+      <p class="note">Demo mode: this button opens a preview with sample data.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div id="view-dash" hidden><div class="wrap dash" id="dashRoot"></div></div>
+
+<footer>© 𝐘𝐀𝐍 · Not affiliated with Discord Inc.</footer>
+
+<script>
+  // ====== EDIT THESE ======
+  var CLIENT_ID = "1550854274555060305";  // bot Application ID
+  // Login and the dashboard now run entirely on this page — nothing redirects offsite.
+  // ========================
+
+  var INVITE = "https://discord.com/oauth2/authorize?client_id=" + CLIENT_ID + "&scope=bot%20applications.commands&permissions=8";
+  var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon fill="currentColor" points="12,1.5 15.2,8.3 22.5,9.2 17.1,14.3 18.5,21.7 12,18.1 5.5,21.7 6.9,14.3 1.5,9.2 8.8,8.3"/></svg>';
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  // ---------- demo data (sample only) ----------
+  var state = {
+    user: null,
+    guilds: [
+      { id: "1", name: "YAN HQ", members: 1284, bot: true, text: ["general", "mod-logs", "announcements", "bot-commands"], voice: ["Lounge", "Music", "Staff VC"], log: "mod-logs", vc: "Lounge",
+        warns: [{ name: "noisy_user", id: "384920117", count: 3, last: "Spamming in #general" }, { name: "raider99", id: "552001938", count: 2, last: "Advertising" }, { name: "newbie_22", id: "771845203", count: 1, last: "Language" }],
+        banned: [{ name: "spammer_bot99", id: "901234567", reason: "Raid attempt" }, { name: "tox1c_gamer", id: "812345098", reason: "Hate speech" }] },
+      { id: "2", name: "Gaming Hub", members: 532, bot: true, text: ["chat", "logs", "clips"], voice: ["Squad 1", "Squad 2"], log: "", vc: "",
+        warns: [], banned: [] },
+      { id: "3", name: "My Test Server", members: 0, bot: false, text: [], voice: [], log: "", vc: "", warns: [], banned: [] }
+    ]
+  };
+
+  // ---------- nav ----------
+  function loginHref() { return "#/login"; }
+  function renderNav() {
+    var right = state.user
+      ? '<a class="t" href="#/dashboard">Dashboard</a><span class="chip"><span class="av">D</span>' + esc(state.user) + '</span><a class="btn ghost small" href="#" data-action="logout">Logout</a>'
+      : '<a class="t hide" href="#features">Features</a><a class="t hide" href="#commands">Commands</a><a class="t hide" href="#how">How it works</a><a class="btn small" href="' + loginHref() + '">Login</a>';
+    document.getElementById("nav").innerHTML =
+      '<a class="logo" href="#top" aria-label="YAN home">' + STAR + '<span>𝐘𝐀𝐍</span></a><div class="links">' + right + "</div>";
+  }
+
+  // ---------- dashboard views ----------
+  function totalWarns(g) { return g.warns.reduce(function (n, w) { return n + w.count; }, 0); }
+
+  function dashList() {
+    return '<div class="banner">★ Preview with sample data. The live dashboard connects to your bot.</div><h2>Your servers</h2><div class="grid">' +
+      state.guilds.map(function (g) {
+        var act = g.bot
+          ? '<a class="btn small" href="#/dashboard/' + g.id + '">Manage</a>'
+          : '<a class="btn small ghost inviteLink" href="' + INVITE + '&guild_id=' + g.id + '" target="_blank" rel="noopener">Invite</a>';
+        return '<div class="card guild"><div class="gl"><div class="av">' + esc(g.name[0]) + '</div><div><div class="gname">' + esc(g.name) + '</div><div class="muted">' +
+          (g.bot ? g.members.toLocaleString() + " members" : "Bot not added") + "</div></div></div>" + act + "</div>";
+      }).join("") + "</div>";
+  }
+
+  function options(list, cur, emptyLabel, prefix) {
+    return (emptyLabel ? '<option value="">' + emptyLabel + "</option>" : "") +
+      list.map(function (n) { return '<option value="' + esc(n) + '"' + (n === cur ? " selected" : "") + ">" + prefix + esc(n) + "</option>"; }).join("");
+  }
+
+  function dashGuild(g) {
+    var rows = g.warns.map(function (w, i) {
+      return "<tr><td>" + esc(w.name) + '<div class="muted">' + esc(w.id) + "</div></td><td>" + w.count + "</td><td>" + esc(w.last) +
+        '</td><td><button class="btn small danger" data-action="clear-warn" data-i="' + i + '">Clear</button></td></tr>';
+    }).join("");
+    var bannedRows = g.banned.map(function (u, i) {
+      return "<tr><td>" + esc(u.name) + '<div class="muted">' + esc(u.id) + "</div></td><td>" + esc(u.reason) +
+        '</td><td><button class="btn small danger" data-action="unban" data-i="' + i + '">Unban</button></td></tr>';
+    }).join("");
+    return '<div class="banner">★ Preview with sample data.</div>' +
+      '<div class="head"><div class="gl"><div class="av">' + esc(g.name[0]) + '</div><div><h2 style="margin:0">' + esc(g.name) + '</h2></div></div><a class="btn ghost small" href="#/dashboard">← Servers</a></div>' +
+      '<div class="stats">' +
+        '<div class="card stat"><span class="muted">Members</span><b>' + g.members.toLocaleString() + "</b></div>" +
+        '<div class="card stat"><span class="muted">Text channels</span><b>' + g.text.length + "</b></div>" +
+        '<div class="card stat"><span class="muted">Voice channels</span><b>' + g.voice.length + "</b></div>" +
+        '<div class="card stat"><span class="muted">Total warnings</span><b>' + totalWarns(g) + "</b></div>" +
+        '<div class="card stat"><span class="muted">Banned users</span><b>' + g.banned.length + "</b></div></div>" +
+      '<div class="two">' +
+        '<div class="card"><h3 style="margin:0 0 4px;font-size:22px">Mod logs</h3><span class="muted">Where kicks, bans, timeouts and warns are logged.</span>' +
+          '<select id="logSel">' + options(g.text, g.log, "None (off)", "# ") + '</select><button class="btn small" data-action="save-log">Save</button></div>' +
+        '<div class="card"><h3 style="margin:0 0 4px;font-size:22px">24/7 voice</h3><span class="status ' + (g.vc ? "on" : "") + '">' + (g.vc ? "Connected to " + esc(g.vc) : "Not connected") + "</span>" +
+          '<select id="vcSel">' + options(g.voice, g.vc || g.voice[0], "", "🔊 ") + '</select><div class="row"><button class="btn small" data-action="join-vc">Join &amp; save</button>' +
+          (g.vc ? '<button class="btn small danger" data-action="leave-vc">Leave</button>' : "") + "</div></div></div>" +
+      '<div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 4px;font-size:22px">Warn a user</h3><span class="muted">Enter who to warn and what to say.</span>' +
+        '<input id="warnName" placeholder="Username" style="width:100%;padding:11px 12px;border-radius:12px;background:#000;color:#fff;border:2px solid var(--line);margin:10px 0">' +
+        '<input id="warnReason" placeholder="Reason" style="width:100%;padding:11px 12px;border-radius:12px;background:#000;color:#fff;border:2px solid var(--line);margin:0 0 14px">' +
+        '<button class="btn small" data-action="add-warn">Warn</button></div>' +
+      '<div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 10px;font-size:22px">Warnings</h3>' +
+        (rows ? '<div class="tscroll"><table><tr><th>User</th><th>Count</th><th>Last reason</th><th></th></tr>' + rows + "</table></div>" : '<span class="muted">No warnings in this server yet.</span>') + "</div>" +
+      '<div class="card"><h3 style="margin:0 0 10px;font-size:22px">Banned users</h3>' +
+        (bannedRows ? '<div class="tscroll"><table><tr><th>User</th><th>Reason</th><th></th></tr>' + bannedRows + "</table></div>" : '<span class="muted">No banned users in this server.</span>') + "</div>";
+  }
+
+  function currentGuild() {
+    var id = location.hash.split("/")[2];
+    return state.guilds.filter(function (g) { return g.id === id && g.bot; })[0];
+  }
+
+  // ---------- router ----------
+  function show(name) {
+    ["landing", "login", "dash"].forEach(function (v) { document.getElementById("view-" + v).hidden = v !== name; });
+  }
+  function route() {
+    var h = location.hash || "";
+    renderNav();
+    if (h.indexOf("#/login") === 0) {
+      if (state.user) { location.hash = "#/dashboard"; return; }
+      show("login"); window.scrollTo(0, 0);
+    } else if (h.indexOf("#/dashboard") === 0) {
+      if (!state.user) { location.hash = "#/login"; return; }
+      show("dash");
+      var g = h.split("/")[2] ? currentGuild() : null;
+      document.getElementById("dashRoot").innerHTML = g ? dashGuild(g) : dashList();
+      window.scrollTo(0, 0);
+    } else {
+      show("landing");
+      if (h.length > 1) { var el = document.getElementById(h.slice(1)); if (el) el.scrollIntoView(); }
+      else window.scrollTo(0, 0);
+    }
+    var links = document.querySelectorAll(".inviteLink");
+    for (var i = 0; i < links.length; i++) if (links[i].getAttribute("href") === "#") links[i].href = INVITE;
+    var ll = document.querySelectorAll(".loginLink");
+    for (var j = 0; j < ll.length; j++) ll[j].href = loginHref();
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2200);
+  }
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-action]");
+    if (!b) return;
+    var a = b.getAttribute("data-action");
+    if (a === "demo-login") { state.user = "Demo User"; location.hash = "#/dashboard"; if (location.hash === "#/dashboard") route(); return; }
+    if (a === "logout") { e.preventDefault(); state.user = null; location.hash = "#/"; route(); return; }
+    var g = currentGuild();
+    if (!g) return;
+    if (a === "save-log") { g.log = document.getElementById("logSel").value; toast(g.log ? "Log channel saved: #" + g.log : "Mod logs turned off."); }
+    if (a === "join-vc") { g.vc = document.getElementById("vcSel").value; toast("Joined " + g.vc + "."); }
+    if (a === "leave-vc") { g.vc = ""; toast("Left the voice channel."); }
+    if (a === "clear-warn") { g.warns.splice(Number(b.getAttribute("data-i")), 1); toast("Warnings cleared."); }
+    if (a === "unban") { var u = g.banned.splice(Number(b.getAttribute("data-i")), 1)[0]; toast(u.name + " has been unbanned."); }
+    if (a === "add-warn") {
+      var nameEl = document.getElementById("warnName"), reasonEl = document.getElementById("warnReason");
+      var name = nameEl.value.trim(), reason = reasonEl.value.trim();
+      if (!name || !reason) { toast("Enter a username and a reason."); return; }
+      var existing = g.warns.filter(function (w) { return w.name === name; })[0];
+      if (existing) { existing.count += 1; existing.last = reason; }
+      else { g.warns.push({ name: name, id: String(Math.floor(100000000 + Math.random() * 900000000)), count: 1, last: reason }); }
+      toast("Warned " + name + ".");
+    }
+    document.getElementById("dashRoot").innerHTML = dashGuild(g);
+  });
+
+  window.addEventListener("hashchange", route);
+  route();
+
+  // ---------- white star cursor ----------
+  (function () {
+    var fine = window.matchMedia("(pointer: fine)").matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!fine) return;
+    document.documentElement.classList.add("cursor-on");
+    var wrap = document.getElementById("cursor");
+    var svg = '<svg viewBox="0 0 24 24" width="100%" height="100%"><polygon fill="#fff" points="12,1.5 15.2,8.3 22.5,9.2 17.1,14.3 18.5,21.7 12,18.1 5.5,21.7 6.9,14.3 1.5,9.2 8.8,8.3"/></svg>';
+    var N = 7, stars = [];
+    for (var i = 0; i < N; i++) {
+      var el = document.createElement("div"); el.className = "star"; el.innerHTML = svg;
+      var size = i === 0 ? 14 : Math.max(3, 9 - i);
+      el.style.width = el.style.height = size + "px";
+      el.style.opacity = i === 0 ? 1 : Math.max(0.1, 0.6 - i * 0.08);
+      wrap.appendChild(el); stars.push({ el: el, x: -100, y: -100, size: size });
+    }
+    var mx = -100, my = -100, seen = false, rot = 0, scale = 1, target = 1;
+    window.addEventListener("mousemove", function (e) {
+      mx = e.clientX; my = e.clientY;
+      if (!seen) { seen = true; stars.forEach(function (s) { s.x = mx; s.y = my; }); wrap.style.opacity = 1; }
+      target = e.target.closest && e.target.closest("a,button,select,input,.card") ? 1.6 : 1;
+    });
+    document.addEventListener("mouseleave", function () { wrap.style.opacity = 0; });
+    document.addEventListener("mouseenter", function () { if (seen) wrap.style.opacity = 1; });
+    (function tick() {
+      rot += 1.2; scale += (target - scale) * 0.2;
+      var px = mx, py = my;
+      stars.forEach(function (s, i) {
+        var k = i === 0 ? 0.5 : 0.34;
+        s.x += (px - s.x) * k; s.y += (py - s.y) * k; px = s.x; py = s.y;
+        s.el.style.transform = "translate3d(" + (s.x - s.size / 2) + "px," + (s.y - s.size / 2) + "px,0) rotate(" + (i === 0 ? rot : -rot) + "deg) scale(" + (i === 0 ? scale : 1) + ")";
+      });
+      requestAnimationFrame(tick);
+    })();
+  })();
+</script>
+</body>
+</html>
