@@ -185,6 +185,19 @@
 
   footer { position: relative; z-index: 1; border-top: 1px solid var(--line); text-align: center; padding: 22px; color: var(--muted); font-size: .9rem; }
 
+  /* ---------- custom cursor: white dot + trail of little stars ---------- */
+  /* Only switched on (by JS) for mouse users, so touch screens and keyboard users keep normal behaviour. */
+  html.has-cursor, html.has-cursor * { cursor: none !important; }
+  #cursor-dot, #cursor-trail { position: fixed; pointer-events: none; mix-blend-mode: difference; /* stays visible over the white buttons */ }
+  #cursor-trail { inset: 0; width: 100%; height: 100%; z-index: 9998; }
+  #cursor-dot {
+    top: 0; left: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
+    background: #fff; box-shadow: 0 0 10px rgba(255,255,255,.75);
+    z-index: 9999; opacity: 0; transition: opacity .15s, width .15s, height .15s, margin .15s;
+  }
+  #cursor-dot.on { opacity: 1; }
+  #cursor-dot.big { width: 22px; height: 22px; margin: -11px 0 0 -11px; }
+
   @media (max-width: 560px) {
     header.top { flex-wrap: wrap; }
     .user span.name { display: none; }
@@ -196,6 +209,8 @@
 <canvas id="sky" aria-hidden="true"></canvas>
 <div id="app"></div>
 <div id="toasts" role="status" aria-live="polite"></div>
+<canvas id="cursor-trail" aria-hidden="true"></canvas>
+<div id="cursor-dot" aria-hidden="true"></div>
 
 <script>
 /* =====================================================================
@@ -314,6 +329,20 @@ async function attempt(fn, okMsg) {
 }
 
 function hueOf(id) { let n = 0; for (const c of String(id)) n = (n * 31 + c.charCodeAt(0)) % 360; return n; }
+
+// "Add to server" link. With a guildId it pre-selects that server.
+function inviteUrl(guildId) {
+  return `https://discord.com/oauth2/authorize?client_id=${CONFIG.CLIENT_ID}&scope=bot%20applications.commands&permissions=8` +
+    (guildId ? `&guild_id=${guildId}&disable_guild_select=true` : "");
+}
+function inviteButton(cls, label, guildId) {
+  return h("a", {
+    class: cls, href: inviteUrl(guildId), target: "_blank", rel: "noopener",
+    onclick: (ev) => {
+      if (CONFIG.CLIENT_ID.startsWith("PUT_")) { ev.preventDefault(); toast("Set CLIENT_ID at the top of index.html first.", true); }
+    },
+  }, label);
+}
 function initialOf(name) { const m = (name || "").match(/[\p{L}\p{N}]/u); return m ? m[0].toUpperCase() : "#"; }
 function guildIcon(g, size = 128) {
   return g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.${g.icon.startsWith("a_") ? "gif" : "png"}?size=${size}` : null;
@@ -369,6 +398,97 @@ function avatar(id, name, url, cls = "") {
 })();
 
 /* =====================================================================
+   Custom cursor: white dot + trail of little stars
+   ===================================================================== */
+(function cursor() {
+  // mouse users only; touch screens keep the normal behaviour
+  if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  const noTrail = matchMedia("(prefers-reduced-motion: reduce)").matches; // dot only, no moving stars
+  const dot = document.getElementById("cursor-dot");
+  const cv = document.getElementById("cursor-trail");
+  const ctx = cv.getContext("2d");
+  let w = 0, ht = 0;
+  function resize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    w = innerWidth; ht = innerHeight;
+    cv.width = w * dpr; cv.height = ht * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  const MAX = 90, SPACING = 9; // one star roughly every 9px of movement
+  const parts = [];
+  let lx = null, ly = null, running = false, last = 0;
+
+  function star(x, y, r, points, rot) {
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const a = rot + (i * Math.PI) / points - Math.PI / 2;
+      const rad = i % 2 === 0 ? r : r * (points === 4 ? 0.36 : 0.45);
+      ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function spawn(x, y) {
+    if (parts.length >= MAX) parts.shift();
+    parts.push({
+      x: x + (Math.random() - .5) * 8, y: y + (Math.random() - .5) * 8,
+      vx: (Math.random() - .5) * 14, vy: Math.random() * 16 + 4, // drifts gently downward
+      r: Math.random() * 3.2 + 2.2, points: Math.random() < .6 ? 4 : 5,
+      rot: Math.random() * 6.28, spin: (Math.random() - .5) * 2,
+      life: 0, max: 520 + Math.random() * 380,
+    });
+    if (!running) { running = true; last = performance.now(); requestAnimationFrame(tick); }
+  }
+
+  function tick(now) {
+    const dt = Math.min(now - last, 50); last = now;
+    ctx.clearRect(0, 0, w, ht);
+    ctx.fillStyle = "#fff";
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.life += dt;
+      if (p.life >= p.max) { parts.splice(i, 1); continue; }
+      const k = 1 - p.life / p.max; // 1 -> 0
+      p.x += (p.vx * dt) / 1000; p.y += (p.vy * dt) / 1000; p.rot += (p.spin * dt) / 1000;
+      ctx.globalAlpha = k * .9;
+      star(p.x, p.y, p.r * (.4 + .6 * k), p.points, p.rot);
+    }
+    ctx.globalAlpha = 1;
+    if (parts.length) requestAnimationFrame(tick);
+    else { running = false; ctx.clearRect(0, 0, w, ht); }
+  }
+
+  addEventListener("mousemove", (e) => {
+    document.documentElement.classList.add("has-cursor"); // hide the arrow only once we know the dot works
+    dot.classList.add("on");
+    dot.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    if (noTrail) return;
+    if (lx === null) { lx = e.clientX; ly = e.clientY; }
+    // drop stars along the path so fast movement still leaves a continuous trail
+    const dx = e.clientX - lx, dy = e.clientY - ly, dist = Math.hypot(dx, dy);
+    if (dist >= SPACING) {
+      const n = Math.min(Math.floor(dist / SPACING), 6);
+      for (let i = 1; i <= n; i++) spawn(lx + (dx * i) / n, ly + (dy * i) / n);
+      lx = e.clientX; ly = e.clientY;
+    }
+  }, { passive: true });
+
+  // dot grows over things you can click
+  addEventListener("mouseover", (e) => {
+    const hit = e.target.closest?.("a, button, select, summary, [role=button], label.switch, input[type=checkbox], input[type=file], input[type=color]");
+    dot.classList.toggle("big", !!hit);
+  }, { passive: true });
+
+  // hide when the mouse leaves the window
+  document.addEventListener("mouseleave", () => { dot.classList.remove("on"); lx = ly = null; });
+  document.addEventListener("mouseenter", () => dot.classList.add("on"));
+})();
+
+/* =====================================================================
    Layout pieces
    ===================================================================== */
 function header(user) {
@@ -376,6 +496,7 @@ function header(user) {
     h("a", { class: "brand", href: "#/dashboard" }, "★ YAN"),
     user && h("nav", { class: "nav" },
       h("a", { class: "link", href: "#/dashboard" }, "Dashboard"),
+      inviteButton("btn ghost sm", "+ Add to server"),
       h("div", { class: "user" },
         avatar(user.id, user.username, userAvatar(user)),
         h("span", { class: "name" }, user.username)),
@@ -420,7 +541,8 @@ function viewLogin(query) {
             urlInput,
             h("span", { class: "muted small", style: "font-weight:400;margin-top:6px" },
               "Changes every time the bot restarts, unless you use an ngrok static domain. Saved in this browser.")),
-          h("button", { class: "btn", type: "button", style: "width:100%", onclick: go }, "Login with Discord")))),
+          h("button", { class: "btn", type: "button", style: "width:100%", onclick: go }, "Login with Discord")),
+        h("div", { style: "margin-top:16px" }, inviteButton("btn ghost", "+ Add YAN to a server")))),
     footer());
 }
 
@@ -441,16 +563,16 @@ async function viewDashboard() {
       h("p", { class: "server-meta" }, g.bot ? `${g.members ?? "?"} members` : "Bot not added"),
       g.bot
         ? h("a", { class: "btn", href: `#/server/${g.id}` }, "Manage")
-        : h("a", {
-            class: "btn ghost", target: "_blank", rel: "noopener",
-            href: `https://discord.com/oauth2/authorize?client_id=${CONFIG.CLIENT_ID}&scope=bot%20applications.commands&permissions=8&guild_id=${g.id}&disable_guild_select=true`,
-          }, "Invite"));
+        : inviteButton("btn ghost", "Invite", g.id));
     grid.append(card);
   }
 
   shell(user,
-    h("h1", { style: "margin-bottom:6px" }, "Your servers"),
-    h("p", { class: "muted", style: "margin-bottom:22px" }, "Servers where you can manage things. Pick one to open its settings."),
+    h("div", { class: "row between", style: "margin-bottom:22px; align-items:flex-end" },
+      h("div", null,
+        h("h1", { style: "margin-bottom:6px" }, "Your servers"),
+        h("p", { class: "muted" }, "Servers where you can manage things. Pick one to open its settings.")),
+      inviteButton("btn", "+ Add YAN to a server")),
     guilds.length ? grid : h("div", { class: "dashed" }, "No servers found. You need the Manage Server permission in a server to see it here."));
 }
 
