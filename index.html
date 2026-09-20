@@ -206,8 +206,8 @@
     <div class="card login">
       <h2>Login</h2>
       <p class="lead" style="margin:0 auto 24px">Sign in with Discord to see the servers you manage.</p>
-      <button class="btn" data-action="demo-login">Login with Discord</button>
-      <p class="note">Demo mode: this button opens a preview with sample data.</p>
+      <button class="btn" data-action="real-login">Login with Discord</button>
+      <p class="note">You'll be sent to Discord to authorize, then brought back here.</p>
     </div>
   </div>
 </div>
@@ -220,7 +220,12 @@
 <script>
   // ====== EDIT THESE ======
   var CLIENT_ID = "1550854274555060305";  // bot Application ID
-  // Login and the dashboard now run entirely on this page — nothing redirects offsite.
+  // Free ngrok URLs change every time the bot restarts. Whenever that happens:
+  //   1) copy the new "Public HTTPS address" from the Wispbyte console
+  //   2) paste it below, replacing the old one
+  //   3) also update the OAuth2 redirect in the Discord Developer Portal to
+  //      <new-url>/auth/callback
+  var BACKEND_URL = "https://italics-crisping-pluck.ngrok-free.dev";
   // ========================
 
   var INVITE = "https://discord.com/oauth2/authorize?client_id=" + CLIENT_ID + "&scope=bot%20applications.commands&permissions=8";
@@ -228,24 +233,36 @@
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 
-  // ---------- demo data (sample only) ----------
-  var state = {
-    user: null,
-    guilds: [
-      { id: "1", name: "YAN HQ", members: 1284, bot: true, text: ["general", "mod-logs", "announcements", "bot-commands"], voice: ["Lounge", "Music", "Staff VC"], log: "mod-logs", vc: "Lounge",
-        warns: [{ name: "noisy_user", id: "384920117", count: 3, last: "Spamming in #general" }, { name: "raider99", id: "552001938", count: 2, last: "Advertising" }, { name: "newbie_22", id: "771845203", count: 1, last: "Language" }],
-        banned: [{ name: "spammer_bot99", id: "901234567", reason: "Raid attempt" }, { name: "tox1c_gamer", id: "812345098", reason: "Hate speech" }] },
-      { id: "2", name: "Gaming Hub", members: 532, bot: true, text: ["chat", "logs", "clips"], voice: ["Squad 1", "Squad 2"], log: "", vc: "",
-        warns: [], banned: [] },
-      { id: "3", name: "My Test Server", members: 0, bot: false, text: [], voice: [], log: "", vc: "", warns: [], banned: [] }
-    ]
-  };
+  // ---------- talk to the real bot API ----------
+  function api(path, opts) {
+    opts = opts || {};
+    opts.credentials = "include";
+    if (opts.body) {
+      opts.headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+      opts.body = JSON.stringify(opts.body);
+    }
+    return fetch(BACKEND_URL + path, opts).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (e) { throw new Error(e.error || r.statusText); });
+      return r.json();
+    });
+  }
+
+  // ---------- live state (loaded from the bot, nothing hardcoded) ----------
+  var state = { user: null, guilds: [], guildCache: {} };
+
+  function loadMe() {
+    return api("/api/me").then(function (u) { state.user = u.username; }).catch(function () { state.user = null; });
+  }
+  function loadGuilds() { return api("/api/guilds").then(function (list) { state.guilds = list; }); }
+  function loadGuildDetail(id) {
+    return api("/api/guilds/" + id).then(function (g) { g.id = id; state.guildCache[id] = g; return g; });
+  }
 
   // ---------- nav ----------
   function loginHref() { return "#/login"; }
   function renderNav() {
     var right = state.user
-      ? '<a class="t" href="#/dashboard">Dashboard</a><span class="chip"><span class="av">D</span>' + esc(state.user) + '</span><a class="btn ghost small" href="#" data-action="logout">Logout</a>'
+      ? '<a class="t" href="#/dashboard">Dashboard</a><span class="chip"><span class="av">' + esc(state.user[0].toUpperCase()) + '</span>' + esc(state.user) + '</span><a class="btn ghost small" href="#" data-action="logout">Logout</a>'
       : '<a class="t hide" href="#features">Features</a><a class="t hide" href="#commands">Commands</a><a class="t hide" href="#how">How it works</a><a class="btn small" href="' + loginHref() + '">Login</a>';
     document.getElementById("nav").innerHTML =
       '<a class="logo" href="#top" aria-label="YAN home">' + STAR + '<span>𝐘𝐀𝐍</span></a><div class="links">' + right + "</div>";
@@ -255,13 +272,14 @@
   function totalWarns(g) { return g.warns.reduce(function (n, w) { return n + w.count; }, 0); }
 
   function dashList() {
-    return '<div class="banner">★ Preview with sample data. The live dashboard connects to your bot.</div><h2>Your servers</h2><div class="grid">' +
+    if (!state.guilds.length) return '<div class="banner">★ No servers found for your account.</div>';
+    return '<div class="banner">★ Connected to your bot — this is live data.</div><h2>Your servers</h2><div class="grid">' +
       state.guilds.map(function (g) {
         var act = g.bot
           ? '<a class="btn small" href="#/dashboard/' + g.id + '">Manage</a>'
           : '<a class="btn small ghost inviteLink" href="' + INVITE + '&guild_id=' + g.id + '" target="_blank" rel="noopener">Invite</a>';
         return '<div class="card guild"><div class="gl"><div class="av">' + esc(g.name[0]) + '</div><div><div class="gname">' + esc(g.name) + '</div><div class="muted">' +
-          (g.bot ? g.members.toLocaleString() + " members" : "Bot not added") + "</div></div></div>" + act + "</div>";
+          (g.bot ? (g.members || 0).toLocaleString() + " members" : "Bot not added") + "</div></div></div>" + act + "</div>";
       }).join("") + "</div>";
   }
 
@@ -271,15 +289,15 @@
   }
 
   function dashGuild(g) {
-    var rows = g.warns.map(function (w, i) {
+    var rows = g.warns.map(function (w) {
       return "<tr><td>" + esc(w.name) + '<div class="muted">' + esc(w.id) + "</div></td><td>" + w.count + "</td><td>" + esc(w.last) +
-        '</td><td><button class="btn small danger" data-action="clear-warn" data-i="' + i + '">Clear</button></td></tr>';
+        '</td><td><button class="btn small danger" data-action="clear-warn" data-id="' + esc(w.id) + '">Clear</button></td></tr>';
     }).join("");
-    var bannedRows = g.banned.map(function (u, i) {
+    var bannedRows = g.banned.map(function (u) {
       return "<tr><td>" + esc(u.name) + '<div class="muted">' + esc(u.id) + "</div></td><td>" + esc(u.reason) +
-        '</td><td><button class="btn small danger" data-action="unban" data-i="' + i + '">Unban</button></td></tr>';
+        '</td><td><button class="btn small danger" data-action="unban" data-id="' + esc(u.id) + '">Unban</button></td></tr>';
     }).join("");
-    return '<div class="banner">★ Preview with sample data.</div>' +
+    return '<div class="banner">★ Connected to your bot — this is live data.</div>' +
       '<div class="head"><div class="gl"><div class="av">' + esc(g.name[0]) + '</div><div><h2 style="margin:0">' + esc(g.name) + '</h2></div></div><a class="btn ghost small" href="#/dashboard">← Servers</a></div>' +
       '<div class="stats">' +
         '<div class="card stat"><span class="muted">Members</span><b>' + g.members.toLocaleString() + "</b></div>" +
@@ -293,6 +311,10 @@
         '<div class="card"><h3 style="margin:0 0 4px;font-size:22px">24/7 voice</h3><span class="status ' + (g.vc ? "on" : "") + '">' + (g.vc ? "Connected to " + esc(g.vc) : "Not connected") + "</span>" +
           '<select id="vcSel">' + options(g.voice, g.vc || g.voice[0], "", "🔊 ") + '</select><div class="row"><button class="btn small" data-action="join-vc">Join &amp; save</button>' +
           (g.vc ? '<button class="btn small danger" data-action="leave-vc">Leave</button>' : "") + "</div></div></div>" +
+      '<div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 4px;font-size:22px">Say something</h3><span class="muted">Pick a channel and send a message as the bot.</span>' +
+        '<select id="sayChannel">' + options(g.text, g.text[0], "", "# ") + '</select>' +
+        '<input id="sayMessage" placeholder="Message" style="width:100%;padding:11px 12px;border-radius:12px;background:#000;color:#fff;border:2px solid var(--line);margin:0 0 14px">' +
+        '<button class="btn small" data-action="do-say">Send</button></div>' +
       '<div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 4px;font-size:22px">Warn a user</h3><span class="muted">Enter who to warn and what to say.</span>' +
         '<input id="warnName" placeholder="Username" style="width:100%;padding:11px 12px;border-radius:12px;background:#000;color:#fff;border:2px solid var(--line);margin:10px 0">' +
         '<input id="warnReason" placeholder="Reason" style="width:100%;padding:11px 12px;border-radius:12px;background:#000;color:#fff;border:2px solid var(--line);margin:0 0 14px">' +
@@ -303,9 +325,14 @@
         (bannedRows ? '<div class="tscroll"><table><tr><th>User</th><th>Reason</th><th></th></tr>' + bannedRows + "</table></div>" : '<span class="muted">No banned users in this server.</span>') + "</div>";
   }
 
-  function currentGuild() {
-    var id = location.hash.split("/")[2];
-    return state.guilds.filter(function (g) { return g.id === id && g.bot; })[0];
+  function currentGuildId() { return location.hash.split("/")[2]; }
+  function renderDashRoot(html) { document.getElementById("dashRoot").innerHTML = html; }
+
+  function refreshGuildView(id) {
+    renderDashRoot('<div class="banner">★ Loading…</div>');
+    loadGuildDetail(id).then(function (g) { renderDashRoot(dashGuild(g)); }).catch(function (e) {
+      renderDashRoot('<div class="banner">★ Could not load this server (' + esc(e.message) + ').</div><a class="btn ghost small" href="#/dashboard">← Servers</a>');
+    });
   }
 
   // ---------- router ----------
@@ -321,8 +348,15 @@
     } else if (h.indexOf("#/dashboard") === 0) {
       if (!state.user) { location.hash = "#/login"; return; }
       show("dash");
-      var g = h.split("/")[2] ? currentGuild() : null;
-      document.getElementById("dashRoot").innerHTML = g ? dashGuild(g) : dashList();
+      var id = h.split("/")[2];
+      if (id) {
+        refreshGuildView(id);
+      } else {
+        renderDashRoot('<div class="banner">★ Loading…</div>');
+        loadGuilds().then(function () { renderDashRoot(dashList()); }).catch(function (e) {
+          renderDashRoot('<div class="banner">★ Could not load your servers (' + esc(e.message) + ').</div>');
+        });
+      }
       window.scrollTo(0, 0);
     } else {
       show("landing");
@@ -346,29 +380,68 @@
     var b = e.target.closest("[data-action]");
     if (!b) return;
     var a = b.getAttribute("data-action");
-    if (a === "demo-login") { state.user = "Demo User"; location.hash = "#/dashboard"; if (location.hash === "#/dashboard") route(); return; }
-    if (a === "logout") { e.preventDefault(); state.user = null; location.hash = "#/"; route(); return; }
-    var g = currentGuild();
-    if (!g) return;
-    if (a === "save-log") { g.log = document.getElementById("logSel").value; toast(g.log ? "Log channel saved: #" + g.log : "Mod logs turned off."); }
-    if (a === "join-vc") { g.vc = document.getElementById("vcSel").value; toast("Joined " + g.vc + "."); }
-    if (a === "leave-vc") { g.vc = ""; toast("Left the voice channel."); }
-    if (a === "clear-warn") { g.warns.splice(Number(b.getAttribute("data-i")), 1); toast("Warnings cleared."); }
-    if (a === "unban") { var u = g.banned.splice(Number(b.getAttribute("data-i")), 1)[0]; toast(u.name + " has been unbanned."); }
+
+    if (a === "real-login") { e.preventDefault(); window.location.href = BACKEND_URL + "/auth/login"; return; }
+
+    if (a === "logout") {
+      e.preventDefault();
+      api("/auth/logout", { method: "POST" }).catch(function () {}).then(function () {
+        state.user = null; state.guilds = []; state.guildCache = {};
+        location.hash = "#/"; route();
+      });
+      return;
+    }
+
+    var id = currentGuildId();
+    if (!id) return;
+
+    if (a === "save-log") {
+      var logVal = document.getElementById("logSel").value;
+      api("/api/guilds/" + id + "/log", { method: "POST", body: { channel: logVal } })
+        .then(function () { toast(logVal ? "Log channel saved: #" + logVal : "Mod logs turned off."); refreshGuildView(id); })
+        .catch(function (err) { toast("Error: " + err.message); });
+    }
+    if (a === "join-vc") {
+      var vcVal = document.getElementById("vcSel").value;
+      api("/api/guilds/" + id + "/voice/join", { method: "POST", body: { channel: vcVal } })
+        .then(function () { toast("Joined " + vcVal + "."); refreshGuildView(id); })
+        .catch(function (err) { toast("Error: " + err.message); });
+    }
+    if (a === "leave-vc") {
+      api("/api/guilds/" + id + "/voice/leave", { method: "POST" })
+        .then(function () { toast("Left the voice channel."); refreshGuildView(id); })
+        .catch(function (err) { toast("Error: " + err.message); });
+    }
+    if (a === "clear-warn") {
+      api("/api/guilds/" + id + "/warn/clear", { method: "POST", body: { userId: b.getAttribute("data-id") } })
+        .then(function () { toast("Warnings cleared."); refreshGuildView(id); })
+        .catch(function (err) { toast("Error: " + err.message); });
+    }
+    if (a === "unban") {
+      api("/api/guilds/" + id + "/unban", { method: "POST", body: { userId: b.getAttribute("data-id") } })
+        .then(function () { toast("User has been unbanned."); refreshGuildView(id); })
+        .catch(function (err) { toast("Error: " + err.message); });
+    }
     if (a === "add-warn") {
       var nameEl = document.getElementById("warnName"), reasonEl = document.getElementById("warnReason");
       var name = nameEl.value.trim(), reason = reasonEl.value.trim();
       if (!name || !reason) { toast("Enter a username and a reason."); return; }
-      var existing = g.warns.filter(function (w) { return w.name === name; })[0];
-      if (existing) { existing.count += 1; existing.last = reason; }
-      else { g.warns.push({ name: name, id: String(Math.floor(100000000 + Math.random() * 900000000)), count: 1, last: reason }); }
-      toast("Warned " + name + ".");
+      api("/api/guilds/" + id + "/warn", { method: "POST", body: { username: name, reason: reason } })
+        .then(function () { toast("Warned " + name + "."); refreshGuildView(id); })
+        .catch(function (err) { toast("Error: " + err.message); });
     }
-    document.getElementById("dashRoot").innerHTML = dashGuild(g);
+    if (a === "do-say") {
+      var chEl = document.getElementById("sayChannel"), msgEl = document.getElementById("sayMessage");
+      var ch = chEl.value, msg = msgEl.value.trim();
+      if (!msg) { toast("Type a message first."); return; }
+      api("/api/guilds/" + id + "/say", { method: "POST", body: { channel: ch, message: msg } })
+        .then(function () { toast("Sent to #" + ch + "."); msgEl.value = ""; })
+        .catch(function (err) { toast("Error: " + err.message); });
+    }
   });
 
   window.addEventListener("hashchange", route);
-  route();
+  loadMe().then(route);
 
   // ---------- white star cursor ----------
   (function () {
