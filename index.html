@@ -567,7 +567,7 @@ function failView(e) {
 }
 
 /* ---------- Server page ---------- */
-const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"]];
+const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"], ["whitelist", "Whitelist"]];
 
 async function viewServer(id, tab = "overview") {
   shell(null, h("p", { class: "muted" }, "Loading server…"));
@@ -594,6 +594,7 @@ async function viewServer(id, tab = "overview") {
   else if (tab === "welcome") await renderWelcome(body, id, data);
   else if (tab === "leveling") await renderLeveling(body, id, data);
   else if (tab === "verify") await renderVerification(body, id, data);
+  else if (tab === "whitelist") await renderWhitelist(body, id, data);
 }
 
 function channelSelect(names, current, noneLabel) {
@@ -1162,10 +1163,24 @@ async function renderLeveling(body, id, d) {
             } }, "Reset")))))
     : h("p", { class: "empty" }, "Nobody has earned XP yet.");
 
+  // Leveling Commands — matches the toggle-per-command layout from the reference dashboard.
+  function commandToggleRow(key, label, desc, checked) {
+    const cb = h("input", { type: "checkbox", checked });
+    cb.onchange = async () => {
+      cb.disabled = true;
+      const ok = await attempt(() => api(`/api/guilds/${id}/leveling`, { method: "POST", body: { commands: { [key]: cb.checked } } }), `${label} ${cb.checked ? "enabled" : "disabled"}`);
+      if (!ok) cb.checked = !cb.checked; // revert on failure
+      cb.disabled = false;
+    };
+    return h("div", { class: "toggle-row" },
+      h("div", null, h("div", { style: "font-weight:600" }, label), h("div", { class: "muted small" }, desc)),
+      h("label", { class: "switch" }, cb, h("i")));
+  }
+
   body.append(
     h("div", { class: "panel" },
       h("h2", null, "Leveling"),
-      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Members earn XP by chatting (and optionally by sitting in voice channels). There are no slash commands here — members can check the leaderboard below."),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Members earn XP by chatting (and optionally by sitting in voice channels)."),
       h("div", { class: "toggle-row" },
         h("div", null, h("div", { style: "font-weight:600" }, "Enabled"), h("div", { class: "muted small" }, "Turn XP tracking on or off")),
         h("label", { class: "switch" }, enabled, h("i"))),
@@ -1182,6 +1197,13 @@ async function renderLeveling(body, id, d) {
       h("label", { class: "field" }, h("span", null, "Level-up message"), levelUpMessage),
       h("label", { class: "field" }, h("span", null, "Announcement channel"), chan),
       saveGeneral),
+    h("div", { class: "panel" },
+      h("h2", null, "Leveling Commands"),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Turn individual slash commands on or off. Members still need to be whitelisted (see the Whitelist tab) to use any YAN command."),
+      commandToggleRow("top", "/top", "Shows the server's XP leaderboard", cfg.commands?.top !== false),
+      commandToggleRow("rank", "/rank", "Shows your (or someone else's) level and XP", cfg.commands?.rank !== false),
+      commandToggleRow("reset", "/reset", "Resets a member's XP to 0 · requires Manage Roles", cfg.commands?.reset !== false),
+      commandToggleRow("setxp", "/setxp", "Sets a member's XP to a specific amount · requires Manage Roles", cfg.commands?.setxp !== false)),
     h("div", { class: "panel" },
       h("h2", null, "Level rewards"),
       h("p", { class: "muted small", style: "margin-bottom:16px" }, "Give a role automatically when a member reaches a level."),
@@ -1294,6 +1316,47 @@ async function renderVerification(body, id, d) {
         h("label", { class: "field" }, h("span", null, "Channel"), chan)),
       h("label", { class: "field" }, h("span", null, "Role to give on verify"), role),
       h("div", { class: "row" }, saveOnly, post)));
+}
+
+/* ---------- Whitelist ---------- */
+async function renderWhitelist(body, id, d) {
+  let cfg;
+  try { cfg = await api(`/api/guilds/${id}/whitelist`); }
+  catch (e) { return failView(e); }
+
+  const roles = d.roles || [];
+  const checks = new Map(); // roleId -> checkbox
+  const roleRows = roles.length
+    ? h("ul", { class: "list" }, roles.map((r) => {
+        const cb = h("input", { type: "checkbox", checked: cfg.roleIds.includes(r.id) });
+        checks.set(r.id, cb);
+        return h("li", null,
+          h("div", { class: "grow" }, r.name),
+          h("label", { class: "switch" }, cb, h("i")));
+      }))
+    : h("p", { class: "empty" }, "This server has no roles to whitelist yet.");
+
+  const save = h("button", { class: "btn", type: "button" }, "Save whitelist");
+  save.onclick = async () => {
+    save.disabled = true;
+    const roleIds = [...checks.entries()].filter(([, cb]) => cb.checked).map(([rid]) => rid);
+    await attempt(() => api(`/api/guilds/${id}/whitelist`, { method: "POST", body: { roleIds } }), "Whitelist saved");
+    save.disabled = false;
+  };
+
+  const dashUrl = cfg.dashboardUrl || location.origin;
+
+  body.append(
+    h("div", { class: "panel" },
+      h("h2", null, "Whitelist"),
+      h("p", { class: "muted small", style: "margin-bottom:16px" },
+        "Pick which roles are allowed to use YAN's slash commands (like /top, /rank, /jail). Leave everything off and YAN stays open to the whole server. Server admins (Manage Server) can always use YAN's commands, whitelist or not."),
+      roleRows,
+      save),
+    h("div", { class: "panel" },
+      h("h2", null, "Dashboard link"),
+      h("p", { class: "muted small", style: "margin-bottom:14px" }, "Anyone allowed to use YAN gets this link when they type /dashboard in Discord."),
+      h("span", { class: "chip" }, dashUrl)));
 }
 
 /* =====================================================================
