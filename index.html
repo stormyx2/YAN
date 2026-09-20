@@ -219,7 +219,9 @@
 const CONFIG = {
   // Your bot's fixed ngrok address (your free dev domain).
   API_DEFAULT: "https://italics-crisping-pluck.ngrok-free.dev",
-  // Your Discord application (client) ID — used by the Invite button.
+  // Fetched automatically from web.js's DISCORD_CLIENT_ID env var right before the
+  // page first renders (see the bottom of this file) — this placeholder is only
+  // used if that fetch fails for some reason (e.g. the bot is offline).
   CLIENT_ID: "PUT_YOUR_DISCORD_CLIENT_ID_HERE",
 };
 
@@ -559,7 +561,7 @@ function failView(e) {
 }
 
 /* ---------- Server page ---------- */
-const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"]];
+const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"]];
 
 async function viewServer(id, tab = "overview") {
   shell(null, h("p", { class: "muted" }, "Loading server…"));
@@ -583,11 +585,19 @@ async function viewServer(id, tab = "overview") {
   else if (tab === "say") renderSay(body, id, data);
   else if (tab === "moderation") renderModeration(body, id, data, refresh);
   else if (tab === "autoreply") await renderAutoReply(body, id);
+  else if (tab === "welcome") await renderWelcome(body, id, data);
+  else if (tab === "leveling") await renderLeveling(body, id, data);
+  else if (tab === "verify") await renderVerification(body, id, data);
 }
 
 function channelSelect(names, current, noneLabel) {
   const sel = h("select", null, h("option", { value: "" }, noneLabel), names.map((n) => h("option", { value: n }, n)));
   sel.value = names.includes(current) ? current : "";
+  return sel;
+}
+function roleSelect(roles, current, noneLabel) {
+  const sel = h("select", null, h("option", { value: "" }, noneLabel), roles.map((r) => h("option", { value: r.id }, r.name)));
+  sel.value = roles.some((r) => r.id === current) ? current : "";
   return sel;
 }
 
@@ -871,6 +881,288 @@ function openAutoReplyModal(id, embeds, existing, done) {
   overlay.addEventListener("keydown", (ev) => { if (ev.key === "Escape") close(); });
 }
 
+/* ---------- Welcome ---------- */
+async function renderWelcome(body, id, d) {
+  let cfg;
+  try { cfg = await api(`/api/guilds/${id}/welcome`); }
+  catch (e) { return failView(e); }
+
+  const enabled = h("input", { type: "checkbox", checked: cfg.enabled });
+  const message = h("textarea", { placeholder: "Welcome {user} to {server}! 🎉", maxlength: "2000" });
+  message.value = cfg.message || "";
+  const chan = channelSelect(d.text, cfg.channel, "No welcome channel");
+  const imageEnabled = h("input", { type: "checkbox", checked: cfg.imageEnabled });
+
+  let background; // undefined = keep, null = remove, dataUrl = replace
+  let hasBg = cfg.hasBackground;
+  const fileInput = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true });
+  const bgBox = h("div");
+  const drawBg = () => {
+    let content;
+    if (typeof background === "string") {
+      content = h("div", { class: "toggle-row" }, h("span", null, "New background ready to upload"),
+        h("button", { class: "btn ghost sm", type: "button", onclick: () => { background = undefined; drawBg(); } }, "Remove"));
+    } else if (hasBg && background !== null) {
+      content = h("div", { class: "toggle-row" }, h("span", null, "Using a custom background"),
+        h("button", { class: "btn danger sm", type: "button", onclick: () => { background = null; drawBg(); } }, "Remove background"));
+    } else {
+      content = h("div", { class: "drop", tabindex: "0", role: "button", onclick: () => fileInput.click(),
+        onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fileInput.click(); } } },
+        h("strong", null, "Click to upload a background"),
+        h("span", { class: "muted small" }, "PNG, JPG, GIF or WEBP · maximum 5MB · falls back to a starfield if skipped"));
+    }
+    bgBox.replaceChildren(content);
+  };
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files[0];
+    fileInput.value = "";
+    if (!f) return;
+    if (!/^image\/(png|jpe?g|gif|webp)$/.test(f.type)) return toast(errText("invalid_image"), true);
+    if (f.size > 5 * 1024 * 1024) return toast(errText("file_too_large"), true);
+    const fr = new FileReader();
+    fr.onload = () => { background = fr.result; drawBg(); };
+    fr.readAsDataURL(f);
+  });
+  drawBg();
+
+  const save = h("button", { class: "btn", type: "button" }, "Save welcome settings");
+  save.onclick = async () => {
+    save.disabled = true;
+    const payload = { enabled: enabled.checked, message: message.value, channel: chan.value, imageEnabled: imageEnabled.checked };
+    if (background !== undefined) payload.background = background;
+    await attempt(() => api(`/api/guilds/${id}/welcome`, { method: "POST", body: payload }), "Welcome settings saved");
+    save.disabled = false;
+  };
+
+  body.append(
+    h("div", { class: "panel", style: "max-width:720px" },
+      h("h2", null, "Welcome message"),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Posted to a channel whenever someone joins the server. Use {user} and {server} in the message."),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Enabled"), h("div", { class: "muted small" }, "Turn welcome messages on or off")),
+        h("label", { class: "switch" }, enabled, h("i"))),
+      h("label", { class: "field" }, h("span", null, "Message"), message),
+      h("label", { class: "field" }, h("span", null, "Channel"), chan)),
+    h("div", { class: "panel", style: "max-width:720px" },
+      h("div", { class: "row between" },
+        h("h2", null, "Welcome image"),
+        !cfg.imageAvailable && h("span", { class: "chip" }, "Needs jimp installed")),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Attaches a generated banner (your background + their avatar + username) to the welcome message."),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Attach an image"), h("div", { class: "muted small" }, "Off = text welcome only")),
+        h("label", { class: "switch" }, imageEnabled, h("i"))),
+      h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Background"), bgBox, fileInput),
+      save));
+}
+
+/* ---------- Leveling ---------- */
+async function renderLeveling(body, id, d) {
+  let cfg, board;
+  try { [cfg, board] = await Promise.all([api(`/api/guilds/${id}/leveling`), api(`/api/guilds/${id}/leveling/leaderboard`)]); }
+  catch (e) { return failView(e); }
+  const refresh = () => viewServer(id, "leveling");
+
+  const enabled = h("input", { type: "checkbox", checked: cfg.enabled });
+  const xpPerMessage = h("input", { type: "text", inputmode: "numeric", value: cfg.xpPerMessage });
+  const cooldownSec = h("input", { type: "text", inputmode: "numeric", value: cfg.cooldownSec });
+  const voiceXpEnabled = h("input", { type: "checkbox", checked: cfg.voiceXpEnabled });
+  const xpPerVoiceMinute = h("input", { type: "text", inputmode: "numeric", value: cfg.xpPerVoiceMinute });
+  const levelUpEnabled = h("input", { type: "checkbox", checked: cfg.levelUpEnabled });
+  const levelUpMessage = h("textarea", { placeholder: "🎉 GG {user}, you're now level {level}!", maxlength: "2000" });
+  levelUpMessage.value = cfg.levelUpMessage || "";
+  const chan = channelSelect(d.text, cfg.channel, "No announcement channel");
+
+  const saveGeneral = h("button", { class: "btn", type: "button" }, "Save leveling settings");
+  saveGeneral.onclick = async () => {
+    saveGeneral.disabled = true;
+    await attempt(() => api(`/api/guilds/${id}/leveling`, { method: "POST", body: {
+      enabled: enabled.checked,
+      xpPerMessage: xpPerMessage.value, cooldownSec: cooldownSec.value,
+      voiceXpEnabled: voiceXpEnabled.checked, xpPerVoiceMinute: xpPerVoiceMinute.value,
+      levelUpEnabled: levelUpEnabled.checked, levelUpMessage: levelUpMessage.value,
+      channel: chan.value,
+    } }), "Leveling settings saved");
+    saveGeneral.disabled = false;
+  };
+
+  // Rewards
+  const rewardLevel = h("input", { type: "text", inputmode: "numeric", placeholder: "Level" });
+  const rewardRole = roleSelect(d.roles || [], "", "Select a role");
+  const rewardDm = h("input", { type: "checkbox" });
+  const rewardRemove = h("input", { type: "checkbox" });
+  const addReward = h("button", { class: "btn sm", type: "button" }, "+ Add reward");
+  addReward.onclick = async () => {
+    if (!rewardLevel.value.trim() || !rewardRole.value) return toast(errText("missing_fields"), true);
+    if (await attempt(() => api(`/api/guilds/${id}/leveling/rewards`, { method: "POST", body: {
+      level: rewardLevel.value, role: rewardRole.value, dm: rewardDm.checked, removeHigher: rewardRemove.checked,
+    } }), "Reward added")) refresh();
+  };
+
+  const rewardsList = cfg.rewards.length
+    ? h("ul", { class: "list" }, cfg.rewards.slice().sort((a, b) => a.level - b.level).map((r) =>
+        h("li", null,
+          h("div", { class: "grow" },
+            h("div", null, `Level ${r.level} → ${r.roleName}`),
+            h("div", { class: "muted small" }, [r.dm && "DMs the member", r.removeHigher && "removes other reward roles"].filter(Boolean).join(" · ") || "no extra actions")),
+          h("button", { class: "btn danger sm", type: "button", onclick: async () => {
+            if (!confirm(`Delete the level ${r.level} reward?`)) return;
+            if (await attempt(() => api(`/api/guilds/${id}/leveling/rewards/${r.id}`, { method: "DELETE" }), "Reward deleted")) refresh();
+          } }, "Delete"))))
+    : h("p", { class: "empty" }, "No level rewards yet.");
+
+  // Leaderboard
+  const boardList = board.length
+    ? h("ul", { class: "list" }, board.map((row, i) =>
+        h("li", null,
+          h("div", { class: "grow" },
+            h("div", null, `#${i + 1} · ${row.name}`),
+            h("div", { class: "muted small" }, `Level ${row.level} · ${row.xp} XP`)),
+          h("div", { class: "row", style: "flex-wrap:nowrap" },
+            h("button", { class: "btn ghost sm", type: "button", onclick: async () => {
+              const val = prompt(`Set XP for ${row.name}:`, row.xp);
+              if (val == null) return;
+              if (await attempt(() => api(`/api/guilds/${id}/leveling/setxp`, { method: "POST", body: { userId: row.id, xp: val } }), "XP updated")) refresh();
+            } }, "Set XP"),
+            h("button", { class: "btn danger sm", type: "button", onclick: async () => {
+              if (!confirm(`Reset ${row.name}'s XP?`)) return;
+              if (await attempt(() => api(`/api/guilds/${id}/leveling/reset`, { method: "POST", body: { userId: row.id } }), "Reset")) refresh();
+            } }, "Reset")))))
+    : h("p", { class: "empty" }, "Nobody has earned XP yet.");
+
+  body.append(
+    h("div", { class: "panel" },
+      h("h2", null, "Leveling"),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Members earn XP by chatting (and optionally by sitting in voice channels). There are no slash commands here — members can check the leaderboard below."),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Enabled"), h("div", { class: "muted small" }, "Turn XP tracking on or off")),
+        h("label", { class: "switch" }, enabled, h("i"))),
+      h("div", { class: "grid-2" },
+        h("label", { class: "field" }, h("span", null, "XP per message"), xpPerMessage),
+        h("label", { class: "field" }, h("span", null, "Cooldown (seconds)"), cooldownSec)),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "XP from voice"), h("div", { class: "muted small" }, "Pays out XP once a minute to anyone sitting in a voice channel")),
+        h("label", { class: "switch" }, voiceXpEnabled, h("i"))),
+      h("label", { class: "field" }, h("span", null, "XP per voice minute"), xpPerVoiceMinute),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Announce level ups"), h("div", { class: "muted small" }, "Posts a message when someone levels up")),
+        h("label", { class: "switch" }, levelUpEnabled, h("i"))),
+      h("label", { class: "field" }, h("span", null, "Level-up message"), levelUpMessage),
+      h("label", { class: "field" }, h("span", null, "Announcement channel"), chan),
+      saveGeneral),
+    h("div", { class: "panel" },
+      h("h2", null, "Level rewards"),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Give a role automatically when a member reaches a level."),
+      h("div", { class: "grid-2", style: "margin-bottom:14px" },
+        h("label", { class: "field" }, h("span", null, "Level"), rewardLevel),
+        h("label", { class: "field" }, h("span", null, "Role"), rewardRole)),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "DM the member")),
+        h("label", { class: "switch" }, rewardDm, h("i"))),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Remove other reward roles")),
+        h("label", { class: "switch" }, rewardRemove, h("i"))),
+      addReward,
+      h("h3", { style: "margin-top:26px" }, "Current rewards"),
+      rewardsList),
+    h("div", { class: "panel" },
+      h("h2", null, "Leaderboard"),
+      boardList));
+}
+
+/* ---------- Verification ---------- */
+async function renderVerification(body, id, d) {
+  let cfg;
+  try { cfg = await api(`/api/guilds/${id}/verify`); }
+  catch (e) { return failView(e); }
+
+  const enabled = h("input", { type: "checkbox", checked: cfg.enabled });
+  const message = h("textarea", { placeholder: "Click the button below to verify and unlock the rest of the server.", maxlength: "2000" });
+  message.value = cfg.message || "";
+  const buttonLabel = h("input", { type: "text", placeholder: "Verify", maxlength: "80" });
+  buttonLabel.value = cfg.buttonLabel || "";
+  const chan = channelSelect(d.text, cfg.channel, "Select a channel");
+  const role = roleSelect(d.roles || [], cfg.roleId, "Select the verified role");
+
+  const MAX_IMAGES = 4;
+  let images = null; // null = keep the saved photos, otherwise this array replaces them on save
+  const fileInput = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", multiple: true, hidden: true });
+  const imgBox = h("div");
+  const currentCount = () => (images === null ? cfg.imageCount : images.length);
+  const drawImages = () => {
+    const parts = [];
+    if (images) {
+      parts.push(h("div", { class: "thumbs" }, images.map((im, i) =>
+        h("div", { class: "thumb" },
+          h("img", { src: im.dataUrl, alt: `Photo ${i + 1}` }),
+          h("button", { type: "button", "aria-label": `Remove photo ${i + 1}`, onclick: () => { images.splice(i, 1); drawImages(); } }, "×")))));
+    } else if (cfg.imageCount) {
+      parts.push(h("div", { class: "toggle-row" }, h("span", null, `Using ${cfg.imageCount} saved image${cfg.imageCount === 1 ? "" : "s"}`),
+        h("button", { class: "btn danger sm", type: "button", onclick: () => { images = []; drawImages(); } }, "Remove all")));
+    }
+    if (currentCount() < MAX_IMAGES) {
+      parts.push(h("div", { class: "drop", tabindex: "0", role: "button", onclick: () => fileInput.click(),
+        onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fileInput.click(); } } },
+        h("strong", null, currentCount() ? "Add another photo" : "Click to upload photos"),
+        h("span", { class: "muted small" }, `Up to ${MAX_IMAGES} photos · PNG, JPG, GIF or WEBP · 5MB each`)));
+    }
+    imgBox.replaceChildren(...parts);
+  };
+  fileInput.addEventListener("change", async () => {
+    if (images === null) images = [];
+    const picked = [...fileInput.files].slice(0, MAX_IMAGES - images.length);
+    fileInput.value = "";
+    for (const f of picked) {
+      if (!/^image\/(png|jpe?g|gif|webp)$/.test(f.type)) { toast(errText("invalid_image"), true); continue; }
+      if (f.size > 5 * 1024 * 1024) { toast(`${f.name}: ${errText("file_too_large")}`, true); continue; }
+      const dataUrl = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(f); });
+      images.push({ dataUrl, size: f.size });
+    }
+    drawImages();
+  });
+  drawImages();
+
+  const buildPayload = () => {
+    const payload = { enabled: enabled.checked, message: message.value, buttonLabel: buttonLabel.value, channel: chan.value, role: role.value };
+    if (images !== null) payload.images = images.map((i) => i.dataUrl);
+    return payload;
+  };
+
+  const saveOnly = h("button", { class: "btn ghost", type: "button" }, "Save settings");
+  saveOnly.onclick = async () => {
+    saveOnly.disabled = true;
+    await attempt(() => api(`/api/guilds/${id}/verify`, { method: "POST", body: buildPayload() }), "Verification settings saved");
+    saveOnly.disabled = false;
+  };
+
+  const post = h("button", { class: "btn", type: "button" }, cfg.posted ? "Update verification message" : "Post verification message");
+  post.onclick = async () => {
+    if (!chan.value) return toast("Pick a channel first.", true);
+    if (!role.value) return toast("Pick a role first.", true);
+    post.disabled = true;
+    const saved = await attempt(() => api(`/api/guilds/${id}/verify`, { method: "POST", body: buildPayload() }));
+    if (saved) await attempt(() => api(`/api/guilds/${id}/verify/post`, { method: "POST" }), "Verification message posted");
+    post.disabled = false;
+  };
+
+  body.append(
+    h("div", { class: "panel", style: "max-width:720px" },
+      h("div", { class: "row between" },
+        h("h2", null, "Verification"),
+        h("span", { class: "chip" }, cfg.posted ? `Posted in #${cfg.channel || "?"}` : "Not posted yet")),
+      h("p", { class: "muted small", style: "margin-bottom:16px" },
+        "Posts a message with a button in a channel. Anyone who presses it gets the role you pick — no extra steps for them."),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Enabled"), h("div", { class: "muted small" }, "Turn the verify button on or off")),
+        h("label", { class: "switch" }, enabled, h("i"))),
+      h("label", { class: "field" }, h("span", null, "Message"), message),
+      h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Photos"), imgBox, fileInput),
+      h("div", { class: "grid-2" },
+        h("label", { class: "field" }, h("span", null, "Button text"), buttonLabel),
+        h("label", { class: "field" }, h("span", null, "Channel"), chan)),
+      h("label", { class: "field" }, h("span", null, "Role to give on verify"), role),
+      h("div", { class: "row" }, saveOnly, post)));
+}
+
 /* =====================================================================
    Router
    ===================================================================== */
@@ -886,8 +1178,17 @@ function route() {
   if (parts[0] === "server" && parts[1]) return viewServer(parts[1], TABS.some(([k]) => k === parts[2]) ? parts[2] : "overview");
   location.hash = "#/dashboard";
 }
-addEventListener("hashchange", route);
-route();
+
+// Grab the real CLIENT_ID from web.js before the first render, so the "Add YAN
+// to a server" button works immediately without anyone editing this file by hand.
+(async () => {
+  try {
+    const cfg = await fetch(getApi() + "/config", { headers: { "ngrok-skip-browser-warning": "1" } }).then((r) => r.json());
+    if (cfg?.clientId) CONFIG.CLIENT_ID = cfg.clientId;
+  } catch {}
+  addEventListener("hashchange", route);
+  route();
+})();
 </script>
 </body>
 </html>
