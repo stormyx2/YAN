@@ -217,31 +217,13 @@
    CONFIG — the only two things you need to edit
    ===================================================================== */
 const CONFIG = {
-  // Your bot's public ngrok address (printed in the bot console as "Public HTTPS address").
-  // You can also paste it on the login page — it gets remembered — so you don't have to redeploy each restart.
-  API_DEFAULT: "https://YOUR-NGROK-URL.ngrok-free.app",
+  // Your bot's fixed ngrok address (your free dev domain).
+  API_DEFAULT: "https://italics-crisping-pluck.ngrok-free.dev",
   // Your Discord application (client) ID — used by the Invite button.
   CLIENT_ID: "PUT_YOUR_DISCORD_CLIENT_ID_HERE",
 };
 
-/* =====================================================================
-   Backend URL (remembered in this browser)
-   ===================================================================== */
-function getApi() {
-  try {
-    const v = localStorage.getItem("yan_api");
-    if (v) return v.replace(/\/+$/, "");
-  } catch {}
-  return CONFIG.API_DEFAULT.replace(/\/+$/, "");
-}
-function setApi(v) {
-  try { localStorage.setItem("yan_api", v.trim().replace(/\/+$/, "")); } catch {}
-}
-// Allow  https://yan-discord-app.netlify.app/?api=https://abc.ngrok-free.app
-(() => {
-  const q = new URLSearchParams(location.search).get("api");
-  if (q) { setApi(q); history.replaceState(null, "", location.pathname + location.hash); }
-})();
+const getApi = () => CONFIG.API_DEFAULT.replace(/\/+$/, "");
 
 /* =====================================================================
    Tiny helpers
@@ -270,7 +252,7 @@ function toast(msg, isErr) {
 }
 
 const ERRORS = {
-  network: "Can't reach the bot. Check that it's running and that the backend URL is current.",
+  network: "Can't reach the bot. Check that it's running.",
   not_logged_in: "You're logged out. Log in again.",
   no_access: "You need the Manage Server permission in that server.",
   bot_not_in_guild: "The bot isn't in that server.",
@@ -520,13 +502,7 @@ async function logout() {
 /* ---------- Login ---------- */
 function viewLogin(query) {
   const err = query.get("error");
-  const urlInput = h("input", { type: "url", value: getApi(), placeholder: "https://xxxx.ngrok-free.app", id: "api-url" });
-  const go = () => {
-    const v = urlInput.value.trim();
-    if (!/^https:\/\//.test(v)) { toast("The backend URL must start with https://", true); return; }
-    setApi(v);
-    location.href = getApi() + "/auth/login";
-  };
+  const go = () => { location.href = getApi() + "/auth/login"; };
   $app.replaceChildren(
     header(null),
     h("main", null,
@@ -536,11 +512,6 @@ function viewLogin(query) {
         h("p", { class: "lead" }, "Manage your Discord servers, warnings and auto replies from one place."),
         h("div", { class: "login-box panel" },
           err && h("div", { class: "banner-error" }, errText(err)),
-          h("label", { class: "field", for: "api-url" },
-            h("span", null, "Bot backend URL"),
-            urlInput,
-            h("span", { class: "muted small", style: "font-weight:400;margin-top:6px" },
-              "Changes every time the bot restarts, unless you use an ngrok static domain. Saved in this browser.")),
           h("button", { class: "btn", type: "button", style: "width:100%", onclick: go }, "Login with Discord")),
         h("div", { style: "margin-top:16px" }, inviteButton("btn ghost", "+ Add YAN to a server")))),
     footer());
@@ -584,7 +555,7 @@ function failView(e) {
       h("p", { class: "muted", style: "margin-bottom:16px" }, errText(e.code)),
       h("div", { class: "row" },
         h("button", { class: "btn", type: "button", onclick: () => route() }, "Try again"),
-        h("a", { class: "btn ghost", href: "#/login" }, "Change backend URL"))));
+        h("a", { class: "btn ghost", href: "#/login" }, "Back to login"))));
 }
 
 /* ---------- Server page ---------- */
