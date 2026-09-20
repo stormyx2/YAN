@@ -1,482 +1,800 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>𝐘𝐀𝐍 — Discord Bot</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YAN — Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>★</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
 <style>
-  :root, .dark {
-    box-sizing: border-box;
-    --fg: #ffffff; --bg: #000000; --mut: #a3a3a3; --line: #2a2a2a; --card: #0b0b0b;
-  }
   :root {
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #000;
+    --card: #0b0b0d;
+    --card-2: #131316;
+    --line: #2a2a30;
+    --text: #fff;
+    --muted: #9a9aa3;
+    --danger: #ff6b6b;
+    --ok: #7be0a1;
+    --focus: #8ab4ff;
+    --font: "Source Serif 4", Georgia, "Times New Roman", serif;
   }
-  .light { --fg: #000000; --bg: #ffffff; --mut: #525252; --line: #dcdcdc; --card: #f7f7f7; }
-  html { scroll-padding-top: env(safe-area-inset-top, 0px); scroll-behavior: smooth; }
   * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
   body {
-    margin: 0; background: #000; color: #fff;
-    font-family: "STIX Two Text", "Times New Roman", Times, serif; font-weight: 700; font-size: 18px; line-height: 1.5;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 17px;
+    line-height: 1.5;
   }
-  button, input, select { font: inherit; color: inherit; }
-  a { color: inherit; text-decoration: none; }
-  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 22px; }
-  [hidden] { display: none !important; }
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+  #app { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+  main { width: 100%; max-width: 1100px; margin: 0 auto; padding: 28px 24px 64px; flex: 1; }
 
-  /* ---------- custom star cursor ---------- */
-  html.cursor-on, html.cursor-on * { cursor: none !important; }
-  #cursor { position: fixed; inset: 0; pointer-events: none; z-index: 99999; mix-blend-mode: difference; opacity: 0; transition: opacity .2s; }
-  #cursor .star { position: absolute; left: 0; top: 0; will-change: transform; }
+  a { color: inherit; }
+  h1, h2, h3 { line-height: 1.2; margin: 0; }
+  h1 { font-size: 2.2rem; }
+  h2 { font-size: 1.5rem; margin-bottom: 14px; }
+  h3 { font-size: 1.1rem; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: .9rem; }
 
-  /* ---------- nav ---------- */
-  nav { position: relative; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
-  .logo { display: flex; align-items: center; gap: 10px; font-size: 26px; letter-spacing: 2px; }
-  .logo svg { width: 22px; height: 22px; }
-  .links { display: flex; align-items: center; gap: 22px; font-size: 17px; }
-  .links a.t { color: var(--mut); } .links a.t:hover { color: var(--fg); }
-  .chip { display: inline-flex; align-items: center; gap: 8px; color: var(--mut); font-size: 16px; }
-  .chip .av { width: 28px; height: 28px; font-size: 14px; }
+  /* ---------- header ---------- */
+  header.top {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    max-width: 1100px; width: 100%; margin: 0 auto; padding: 22px 24px 0;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 1.7rem; font-weight: 700; letter-spacing: .12em; text-decoration: none; }
+  .nav { display: flex; align-items: center; gap: 16px; }
+  .nav a.link { color: var(--muted); text-decoration: none; font-weight: 600; }
+  .nav a.link:hover { color: var(--text); }
+  .user { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .user .ava { width: 34px; height: 34px; }
 
-  /* ---------- buttons ---------- */
+  /* ---------- buttons / inputs ---------- */
   .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
-    background: var(--fg); color: var(--bg); border: 2px solid var(--fg);
-    padding: 13px 26px; border-radius: 999px; font-size: 18px; transition: transform .15s ease, opacity .15s ease;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 20px; border-radius: 999px; border: 2px solid var(--text);
+    background: var(--text); color: #000; font: inherit; font-size: .95rem; font-weight: 700;
+    text-decoration: none; cursor: pointer; text-align: center;
   }
-  .btn:hover { transform: translateY(-2px); }
-  .btn.ghost { background: transparent; color: var(--fg); }
-  .btn.small { padding: 7px 16px; font-size: 15px; }
-  .btn.danger { background: transparent; color: var(--fg); border-color: var(--line); }
-  .btn[aria-disabled="true"] { opacity: .5; }
-
-  /* ---------- hero ---------- */
-  .hero {
-    text-align: center; padding: 84px 0 84px; background: #000;
-    background-image: radial-gradient(rgba(255,255,255,.16) 1px, transparent 1px); background-size: 30px 30px;
+  .btn:hover { filter: brightness(.88); }
+  .btn.ghost { background: transparent; color: var(--text); }
+  .btn.ghost:hover { background: rgba(255,255,255,.1); filter: none; }
+  .btn.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  .btn.danger:hover { background: rgba(255,107,107,.12); filter: none; }
+  .btn.sm { padding: 6px 14px; font-size: .85rem; }
+  .btn[disabled] { opacity: .5; cursor: not-allowed; }
+  .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .tab:focus-visible, .drop:focus-visible {
+    outline: 3px solid var(--focus); outline-offset: 2px;
   }
-  .pill { display: inline-block; border: 2px solid var(--line); border-radius: 999px; padding: 5px 16px; font-size: 15px; color: var(--mut); margin-bottom: 22px; background: #000; }
-  h1 { font-size: clamp(64px, 16vw, 168px); line-height: 1; margin: 0 0 14px; letter-spacing: 6px; }
-  .sub { color: var(--mut); font-size: clamp(18px, 2.4vw, 22px); max-width: 620px; margin: 0 auto 34px; }
-  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  .note { color: var(--mut); font-size: 15px; margin-top: 16px; }
 
-  /* ---------- sections ---------- */
-  .sec { background: var(--bg); color: var(--fg); padding: 72px 0; }
-  .sec.dark { border-top: 1px solid var(--line); }
-  h2 { font-size: clamp(30px, 5vw, 46px); margin: 0 0 10px; letter-spacing: 1px; line-height: 1.1; }
-  .lead { color: var(--mut); margin: 0 0 34px; max-width: 640px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; }
-  .card { background: var(--card); color: var(--fg); border: 2px solid var(--line); border-radius: 18px; padding: 24px; transition: border-color .2s; }
-  .card:hover { border-color: var(--fg); }
-  .card .ic { font-size: 26px; margin-bottom: 8px; }
-  .card h3 { margin: 0 0 6px; font-size: 22px; }
-  .card p { margin: 0; color: var(--mut); font-size: 17px; }
-  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
-  .num { width: 42px; height: 42px; border-radius: 50%; background: var(--fg); color: var(--bg); display: grid; place-items: center; font-size: 20px; margin-bottom: 12px; }
-  .step h3 { margin: 0 0 4px; font-size: 22px; } .step p { margin: 0; color: var(--mut); font-size: 17px; }
-  .group { margin-bottom: 26px; }
-  .group h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: var(--mut); }
-  .cmds { display: flex; flex-wrap: wrap; gap: 8px; }
-  .cmd { border: 2px solid var(--line); border-radius: 10px; padding: 4px 12px; font-size: 16px; background: var(--card); }
-  .final .box { border: 2px solid var(--line); border-radius: 28px; padding: 64px 20px; text-align: center; }
-  footer { text-align: center; color: var(--mut); font-size: 15px; padding: 30px 0 40px; background: #000; border-top: 1px solid var(--line); }
+  label.field { display: block; margin-bottom: 14px; }
+  label.field > span { display: block; font-weight: 600; margin-bottom: 6px; }
+  input[type=text], input[type=url], select, textarea {
+    width: 100%; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: #050507; color: var(--text); font: inherit; font-size: .95rem;
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  input[type=color] { width: 54px; height: 40px; padding: 2px; border: 1px solid var(--line); border-radius: 10px; background: #050507; cursor: pointer; }
+  ::placeholder { color: #6b6b74; }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px;
+  }
+  .panel + .panel { margin-top: 20px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row.between { justify-content: space-between; }
+  .dashed { border: 1px dashed var(--line); border-radius: 14px; padding: 14px 18px; color: var(--muted); }
 
   /* ---------- login ---------- */
-  .center { min-height: 60vh; display: grid; place-items: center; padding: 40px 0; }
-  .login { max-width: 440px; width: 100%; text-align: center; padding: 40px 28px; }
-  .login h2 { font-size: 34px; }
+  .hero { text-align: center; padding: 8vh 0 0; }
+  .hero .big-star { font-size: 3rem; }
+  .hero h1 { font-size: clamp(3rem, 9vw, 5.5rem); letter-spacing: .14em; margin: 6px 0 12px; }
+  .hero p.lead { max-width: 34ch; margin: 0 auto 28px; color: var(--muted); font-size: 1.15rem; }
+  .login-box { max-width: 460px; margin: 0 auto; text-align: left; }
+  .banner-error { border: 1px solid var(--danger); color: var(--danger); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; }
 
-  /* ---------- dashboard ---------- */
-  .dash { padding-top: 10px; padding-bottom: 60px; }
-  .banner { border: 2px dashed var(--line); border-radius: 14px; padding: 10px 16px; color: var(--mut); font-size: 15px; margin-bottom: 24px; }
-  .dash h2 { font-size: 34px; }
-  .guild { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .gl { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .av { width: 46px; height: 46px; flex: none; border-radius: 50%; background: var(--fg); color: var(--bg); display: grid; place-items: center; font-size: 20px; }
-  .gname { font-size: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .muted { color: var(--mut); font-size: 15px; }
-  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .stat b { display: block; font-size: 32px; line-height: 1.1; }
-  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
-  select {
-    width: 100%; padding: 11px 12px; border-radius: 12px; background: #000; color: #fff; border: 2px solid var(--line);
-    margin: 10px 0 14px; font-size: 17px;
+  /* ---------- server cards ---------- */
+  .servers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; padding: 0; margin: 0; list-style: none; }
+  .server-card { position: relative; display: flex; flex-direction: column; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+  .server-banner {
+    position: relative; width: 100%; height: 76px; overflow: hidden;
+    background:
+      radial-gradient(1.6px 1.6px at 10% 28%, #fff, transparent 60%),
+      radial-gradient(1px 1px at 22% 68%, #fff, transparent 60%),
+      radial-gradient(1.4px 1.4px at 35% 20%, #fff, transparent 60%),
+      radial-gradient(1px 1px at 47% 58%, #fff, transparent 60%),
+      radial-gradient(1.8px 1.8px at 58% 30%, #fff, transparent 60%),
+      radial-gradient(1px 1px at 68% 74%, #fff, transparent 60%),
+      radial-gradient(1.4px 1.4px at 79% 22%, #fff, transparent 60%),
+      radial-gradient(1px 1px at 88% 60%, #fff, transparent 60%),
+      radial-gradient(1.2px 1.2px at 94% 34%, #fff, transparent 60%),
+      linear-gradient(160deg, hsl(var(--hue, 260) 55% 16%), #000 90%);
   }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .status { display: inline-block; padding: 2px 12px; border-radius: 999px; border: 2px solid var(--line); font-size: 14px; color: var(--mut); }
-  .status.on { border-color: #fff; color: #fff; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid var(--line); font-size: 16px; }
-  th { color: var(--mut); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
-  .tscroll { overflow-x: auto; }
-  .toast {
-    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px);
-    background: #fff; color: #000; padding: 12px 22px; border-radius: 999px; opacity: 0; pointer-events: none;
-    transition: all .25s ease; z-index: 9000; font-size: 16px;
+  .server-banner::after { content: "★"; position: absolute; left: 14px; top: 8px; font-size: 13px; opacity: .85; }
+  .server-owner { position: absolute; top: 10px; right: 10px; padding: 3px 10px; border-radius: 999px; background: var(--text); color: #000; font-size: .75rem; font-weight: 700; line-height: 1.4; }
+  .ava { flex: none; border-radius: 50%; background: hsl(var(--hue, 260) 45% 32%); display: grid; place-items: center; overflow: hidden; font-weight: 700; color: #fff; }
+  .ava img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .server-card .ava { width: 76px; height: 76px; margin-top: -38px; border: 4px solid var(--card); font-size: 1.7rem; position: relative; }
+  .server-name {
+    width: 100%; margin: 12px 0 2px; padding: 0 16px; text-align: center; font-size: 1.05rem; font-weight: 700; line-height: 1.3;
+    min-height: 2.6em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
   }
-  .toast.show { opacity: 1; transform: translate(-50%, 0); }
-  @media (max-width: 640px) { .links .hide { display: none; } .hero { padding: 48px 0; } }
-  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn:hover { transform: none; } }
+  .server-meta { margin: 0 0 16px; font-size: .85rem; color: var(--muted); }
+  .server-card .btn { width: calc(100% - 32px); margin: auto 16px 16px; }
+
+  /* ---------- server page ---------- */
+  .crumb { display: inline-block; margin-bottom: 10px; color: var(--muted); text-decoration: none; font-weight: 600; }
+  .crumb:hover { color: var(--text); }
+  .server-head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+  .server-head .ava { width: 64px; height: 64px; font-size: 1.5rem; }
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 24px; overflow-x: auto; }
+  .tab { padding: 10px 18px; color: var(--muted); text-decoration: none; font-weight: 600; border-bottom: 3px solid transparent; white-space: nowrap; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--text); }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .stat b { display: block; font-size: 1.8rem; }
+  .list { list-style: none; margin: 14px 0 0; padding: 0; }
+  .list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .list li:first-child { border-top: 0; }
+  .list .grow { min-width: 0; flex: 1; }
+  .list .grow > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .empty { color: var(--muted); padding: 10px 0 0; }
+
+  .ar-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .ar-card .msg { color: var(--muted); font-size: .92rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .ar-trigger { font-weight: 700; overflow-wrap: anywhere; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 12px; font-size: .8rem; color: var(--muted); }
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+
+  /* ---------- modal ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.72); display: grid; place-items: center; padding: 16px; }
+  .modal { width: 100%; max-width: 560px; max-height: calc(100vh - 32px); overflow-y: auto; background: var(--card-2); border: 1px solid var(--line); border-radius: 18px; padding: 24px; }
+  .modal h2 { margin-bottom: 4px; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+  .switch { position: relative; width: 48px; height: 28px; flex: none; }
+  .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .switch i { position: absolute; inset: 0; border-radius: 999px; background: #3a3a42; transition: background .15s; }
+  .switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .switch input:checked + i { background: #5b6cff; }
+  .switch input:checked + i::after { transform: translateX(20px); }
+  .switch input:focus-visible + i { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .drop { display: grid; place-items: center; gap: 4px; text-align: center; padding: 22px; border: 2px dashed var(--line); border-radius: 12px; cursor: pointer; margin-bottom: 14px; background: #050507; }
+  .drop:hover { border-color: var(--muted); }
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .thumb { position: relative; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #050507; }
+  .thumb img { display: block; width: 100%; height: 100px; object-fit: cover; }
+  .thumb button { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: rgba(0,0,0,.75); color: #fff; font-size: 16px; line-height: 1; cursor: pointer; }
+  .thumb button:hover { background: #000; }
+  .thumb button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  /* ---------- toasts ---------- */
+  #toasts { position: fixed; right: 16px; bottom: 16px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+  .toast { background: var(--card-2); border: 1px solid var(--line); border-left: 4px solid var(--ok); border-radius: 10px; padding: 10px 16px; max-width: 340px; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+  .toast.err { border-left-color: var(--danger); }
+
+  footer { position: relative; z-index: 1; border-top: 1px solid var(--line); text-align: center; padding: 22px; color: var(--muted); font-size: .9rem; }
+
+  @media (max-width: 560px) {
+    header.top { flex-wrap: wrap; }
+    .user span.name { display: none; }
+    main { padding: 20px 16px 48px; }
+  }
 </style>
 </head>
 <body>
-<div id="cursor" aria-hidden="true"></div>
-<div id="toast" class="toast" role="status"></div>
-
-<div class="wrap"><nav id="nav"></nav></div>
-
-<!-- ================= LANDING ================= -->
-<div id="view-landing">
-  <header class="hero" id="top">
-    <div class="wrap">
-      <div class="pill">★ Free moderation bot for Discord</div>
-      <h1 aria-label="YAN">𝐘𝐀𝐍</h1>
-      <p class="sub">Moderation, warnings, logs, and a bot that stays in your voice channel 24/7. Add it, log in, and manage everything from one place.</p>
-      <div class="cta">
-        <a class="btn inviteLink" href="#" target="_blank" rel="noopener">★ Add to Discord</a>
-        <a class="btn ghost loginLink" href="#/login">Login to Dashboard</a>
-      </div>
-      <div class="note">Step 1: add the bot. Step 2: log in to open your dashboard.</div>
-    </div>
-  </header>
-
-  <section class="sec light" id="features">
-    <div class="wrap">
-      <h2>Everything a server needs</h2>
-      <p class="lead">Simple slash commands with permission checks built in, so nobody can abuse them.</p>
-      <div class="grid">
-        <div class="card"><div class="ic">★</div><h3>Moderation</h3><p>Kick, ban, unban, timeout, purge, lock channels, and set slowmode.</p></div>
-        <div class="card"><div class="ic">★</div><h3>Warning system</h3><p>Warn members, view history, remove one warning, or clear all. Members get a DM.</p></div>
-        <div class="card"><div class="ic">★</div><h3>Mod logs</h3><p>Send every kick, ban, timeout, and warning to the channel you choose.</p></div>
-        <div class="card"><div class="ic">★</div><h3>24/7 voice</h3><p>Run /join once and the bot stays, even after a restart. Works in every server.</p></div>
-        <div class="card"><div class="ic">★</div><h3>Safe by design</h3><p>Role checks stop moderators from acting on people above them.</p></div>
-        <div class="card"><div class="ic">★</div><h3>Web dashboard</h3><p>Manage logs, voice, and warnings from your browser after logging in.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="sec dark" id="how">
-    <div class="wrap">
-      <h2>Ready in a minute</h2>
-      <p class="lead">No setup files. No complicated config.</p>
-      <div class="steps">
-        <div class="step"><div class="num">1</div><h3>Add the bot</h3><p>Press Add to Discord and pick your server.</p></div>
-        <div class="step"><div class="num">2</div><h3>Move the role up</h3><p>Drag the bot's role above the roles it should moderate.</p></div>
-        <div class="step"><div class="num">3</div><h3>Log in</h3><p>Open the dashboard with Discord and set your logs and voice channel.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="sec light" id="commands">
-    <div class="wrap">
-      <h2>Commands</h2>
-      <p class="lead">Moderation commands only show for people with the right permissions.</p>
-      <div class="group"><h3>Moderation</h3><div class="cmds">
-        <span class="cmd">/kick</span><span class="cmd">/ban</span><span class="cmd">/unban</span><span class="cmd">/timeout</span><span class="cmd">/untimeout</span>
-        <span class="cmd">/warn</span><span class="cmd">/warnings</span><span class="cmd">/unwarn</span><span class="cmd">/clearwarnings</span>
-        <span class="cmd">/purge</span><span class="cmd">/slowmode</span><span class="cmd">/lock</span><span class="cmd">/unlock</span>
-        <span class="cmd">/nick</span><span class="cmd">/addrole</span><span class="cmd">/removerole</span><span class="cmd">/setlogs</span>
-      </div></div>
-      <div class="group"><h3>Voice</h3><div class="cmds"><span class="cmd">/join</span><span class="cmd">/leave</span></div></div>
-      <div class="group"><h3>Info &amp; fun</h3><div class="cmds">
-        <span class="cmd">/ping</span><span class="cmd">/avatar</span><span class="cmd">/userinfo</span><span class="cmd">/serverinfo</span>
-        <span class="cmd">/8ball</span><span class="cmd">/coinflip</span><span class="cmd">/roll</span><span class="cmd">/say</span><span class="cmd">/help</span>
-      </div></div>
-    </div>
-  </section>
-
-  <section class="sec dark final">
-    <div class="wrap"><div class="box">
-      <h2>Add 𝐘𝐀𝐍 to your server</h2>
-      <p class="lead" style="margin:0 auto 26px">Free, fast, and built for moderators.</p>
-      <a class="btn inviteLink" href="#" target="_blank" rel="noopener">★ Add to Discord</a>
-    </div></div>
-  </section>
-</div>
-
-<!-- ================= LOGIN ================= -->
-<div id="view-login" hidden>
-  <div class="wrap center">
-    <div class="card login">
-      <h2>Login</h2>
-      <p class="lead" style="margin:0 auto 24px">Sign in with Discord to see the servers you manage.</p>
-      <button class="btn" data-action="real-login">Login with Discord</button>
-      <p class="note">You'll be sent to Discord to authorize, then brought back here.</p>
-    </div>
-  </div>
-</div>
-
-<!-- ================= DASHBOARD ================= -->
-<div id="view-dash" hidden><div class="wrap dash" id="dashRoot"></div></div>
-
-<footer>© 𝐘𝐀𝐍 · Not affiliated with Discord Inc.</footer>
+<canvas id="sky" aria-hidden="true"></canvas>
+<div id="app"></div>
+<div id="toasts" role="status" aria-live="polite"></div>
 
 <script>
-  // ====== EDIT THESE ======
-  var CLIENT_ID = "1550854274555060305";  // bot Application ID
-  // Free ngrok URLs change every time the bot restarts. Whenever that happens:
-  //   1) copy the new "Public HTTPS address" from the Wispbyte console
-  //   2) paste it below, replacing the old one
-  //   3) also update the OAuth2 redirect in the Discord Developer Portal to
-  //      <new-url>/auth/callback
-  var BACKEND_URL = "https://italics-crisping-pluck.ngrok-free.dev";
-  // ========================
+/* =====================================================================
+   CONFIG — the only two things you need to edit
+   ===================================================================== */
+const CONFIG = {
+  // Your bot's public ngrok address (printed in the bot console as "Public HTTPS address").
+  // You can also paste it on the login page — it gets remembered — so you don't have to redeploy each restart.
+  API_DEFAULT: "https://YOUR-NGROK-URL.ngrok-free.app",
+  // Your Discord application (client) ID — used by the Invite button.
+  CLIENT_ID: "PUT_YOUR_DISCORD_CLIENT_ID_HERE",
+};
 
-  var INVITE = "https://discord.com/oauth2/authorize?client_id=" + CLIENT_ID + "&scope=bot%20applications.commands&permissions=8";
-  var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon fill="currentColor" points="12,1.5 15.2,8.3 22.5,9.2 17.1,14.3 18.5,21.7 12,18.1 5.5,21.7 6.9,14.3 1.5,9.2 8.8,8.3"/></svg>';
+/* =====================================================================
+   Backend URL (remembered in this browser)
+   ===================================================================== */
+function getApi() {
+  try {
+    const v = localStorage.getItem("yan_api");
+    if (v) return v.replace(/\/+$/, "");
+  } catch {}
+  return CONFIG.API_DEFAULT.replace(/\/+$/, "");
+}
+function setApi(v) {
+  try { localStorage.setItem("yan_api", v.trim().replace(/\/+$/, "")); } catch {}
+}
+// Allow  https://yan-discord-app.netlify.app/?api=https://abc.ngrok-free.app
+(() => {
+  const q = new URLSearchParams(location.search).get("api");
+  if (q) { setApi(q); history.replaceState(null, "", location.pathname + location.hash); }
+})();
 
-  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+/* =====================================================================
+   Tiny helpers
+   ===================================================================== */
+function h(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false && typeof n[k] !== "boolean") continue;
+    if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (typeof v === "boolean") n[k] = v;
+    else n.setAttribute(k, v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid == null || kid === false) continue;
+    n.append(kid.nodeType ? kid : document.createTextNode(kid));
+  }
+  return n;
+}
+const $app = document.getElementById("app");
 
-  // ---------- talk to the real bot API ----------
-  function api(path, opts) {
-    opts = opts || {};
-    opts.credentials = "include";
-    if (opts.body) {
-      opts.headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
-      opts.body = JSON.stringify(opts.body);
-    }
-    return fetch(BACKEND_URL + path, opts).then(function (r) {
-      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (e) { throw new Error(e.error || r.statusText); });
-      return r.json();
+function toast(msg, isErr) {
+  const t = h("div", { class: "toast" + (isErr ? " err" : "") }, msg);
+  document.getElementById("toasts").append(t);
+  setTimeout(() => t.remove(), 4200);
+}
+
+const ERRORS = {
+  network: "Can't reach the bot. Check that it's running and that the backend URL is current.",
+  not_logged_in: "You're logged out. Log in again.",
+  no_access: "You need the Manage Server permission in that server.",
+  bot_not_in_guild: "The bot isn't in that server.",
+  channel_not_found: "That channel doesn't exist. Pick one from the list.",
+  member_not_found: "Couldn't find that member. Check the username, or that the bot's Server Members Intent is on.",
+  missing_fields: "Fill in every field.",
+  missing_trigger: "Enter a trigger.",
+  empty_reply: "Add a message, an image or an embed.",
+  too_many_autoreplies: "You've reached the limit of 50 auto replies.",
+  too_many_embeds: "You've reached the limit of 25 embeds.",
+  missing_name: "Give it a name.",
+  invalid_image: "That image isn't supported. Use PNG, JPG, GIF or WEBP.",
+  file_too_large: "That image is over 5MB.",
+  unban_failed: "Couldn't unban. The bot needs the Ban Members permission.",
+  autoreply_not_found: "That auto reply no longer exists.",
+  oauth_failed: "Discord login failed. Try again.",
+  empty_message: "Write a message or add a photo.",
+  message_too_long: "That message is too long. Discord allows 2000 characters (4000 in an embed).",
+  too_many_images: "You can send up to 4 photos at once.",
+  total_too_large: "Those photos add up to more than 10MB. Remove one or use smaller files.",
+  bot_missing_permission: "The bot can't post there. Give it View Channel, Send Messages, Attach Files and Embed Links in that channel.",
+  send_failed: "Discord rejected the message. Check the bot's permissions in that channel.",
+  missing_code: "Discord didn't return a login code. Try again.",
+};
+const errText = (code) => ERRORS[code] || `Something went wrong (${code}).`;
+
+class ApiError extends Error { constructor(code) { super(code); this.code = code; } }
+
+async function api(path, { method = "GET", body } = {}) {
+  let res;
+  try {
+    res = await fetch(getApi() + path, {
+      method,
+      credentials: "include",
+      headers: {
+        "ngrok-skip-browser-warning": "1",
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
+  } catch { throw new ApiError("network"); }
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (res.status === 401) throw new ApiError("not_logged_in");
+  if (!res.ok) throw new ApiError(data?.error || "error_" + res.status);
+  return data;
+}
+
+// run an action, toast on failure
+async function attempt(fn, okMsg) {
+  try { const r = await fn(); if (okMsg) toast(okMsg); return r; }
+  catch (e) {
+    if (e.code === "not_logged_in") { location.hash = "#/login"; return; }
+    toast(errText(e.code), true);
   }
+}
 
-  // ---------- live state (loaded from the bot, nothing hardcoded) ----------
-  var state = { user: null, guilds: [], guildCache: {} };
+function hueOf(id) { let n = 0; for (const c of String(id)) n = (n * 31 + c.charCodeAt(0)) % 360; return n; }
+function initialOf(name) { const m = (name || "").match(/[\p{L}\p{N}]/u); return m ? m[0].toUpperCase() : "#"; }
+function guildIcon(g, size = 128) {
+  return g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.${g.icon.startsWith("a_") ? "gif" : "png"}?size=${size}` : null;
+}
+function userAvatar(u) {
+  return u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.${u.avatar.startsWith("a_") ? "gif" : "png"}?size=64` : null;
+}
+function avatar(id, name, url, cls = "") {
+  const box = h("div", { class: "ava " + cls, style: `--hue:${hueOf(id)}` });
+  const letter = h("span", null, initialOf(name));
+  if (url) {
+    const img = h("img", { src: url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" });
+    img.onerror = () => { img.remove(); box.append(letter); };
+    box.append(img);
+  } else box.append(letter);
+  return box;
+}
 
-  function loadMe() {
-    return api("/api/me").then(function (u) { state.user = u.username; }).catch(function () { state.user = null; });
+/* =====================================================================
+   Star field background
+   ===================================================================== */
+(function sky() {
+  const c = document.getElementById("sky"), ctx = c.getContext("2d");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let stars = [], w = 0, h_ = 0;
+  function resize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    w = innerWidth; h_ = innerHeight;
+    c.width = w * dpr; c.height = h_ * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const count = Math.round((w * h_) / 9000);
+    stars = Array.from({ length: count }, () => ({
+      x: Math.random() * w, y: Math.random() * h_,
+      r: Math.random() * 1.3 + .3, a: Math.random() * .6 + .25,
+      s: Math.random() * .02 + .004, p: Math.random() * 6.28,
+    }));
+    draw(0);
   }
-  function loadGuilds() { return api("/api/guilds").then(function (list) { state.guilds = list; }); }
-  function loadGuildDetail(id) {
-    return api("/api/guilds/" + id).then(function (g) { g.id = id; state.guildCache[id] = g; return g; });
-  }
-
-  // ---------- nav ----------
-  function loginHref() { return "#/login"; }
-  function renderNav() {
-    var right = state.user
-      ? '<a class="t" href="#/dashboard">Dashboard</a><span class="chip"><span class="av">' + esc(state.user[0].toUpperCase()) + '</span>' + esc(state.user) + '</span><a class="btn ghost small" href="#" data-action="logout">Logout</a>'
-      : '<a class="t hide" href="#features">Features</a><a class="t hide" href="#commands">Commands</a><a class="t hide" href="#how">How it works</a><a class="btn small" href="' + loginHref() + '">Login</a>';
-    document.getElementById("nav").innerHTML =
-      '<a class="logo" href="#top" aria-label="YAN home">' + STAR + '<span>𝐘𝐀𝐍</span></a><div class="links">' + right + "</div>";
-  }
-
-  // ---------- dashboard views ----------
-  function totalWarns(g) { return g.warns.reduce(function (n, w) { return n + w.count; }, 0); }
-
-  function dashList() {
-    if (!state.guilds.length) return '<div class="banner">★ No servers found for your account.</div>';
-    return '<div class="banner">★ Connected to your bot — this is live data.</div><h2>Your servers</h2><div class="grid">' +
-      state.guilds.map(function (g) {
-        var act = g.bot
-          ? '<a class="btn small" href="#/dashboard/' + g.id + '">Manage</a>'
-          : '<a class="btn small ghost inviteLink" href="' + INVITE + '&guild_id=' + g.id + '" target="_blank" rel="noopener">Invite</a>';
-        return '<div class="card guild"><div class="gl"><div class="av">' + esc(g.name[0]) + '</div><div><div class="gname">' + esc(g.name) + '</div><div class="muted">' +
-          (g.bot ? (g.members || 0).toLocaleString() + " members" : "Bot not added") + "</div></div></div>" + act + "</div>";
-      }).join("") + "</div>";
-  }
-
-  function options(list, cur, emptyLabel, prefix) {
-    return (emptyLabel ? '<option value="">' + emptyLabel + "</option>" : "") +
-      list.map(function (n) { return '<option value="' + esc(n) + '"' + (n === cur ? " selected" : "") + ">" + prefix + esc(n) + "</option>"; }).join("");
-  }
-
-  function dashGuild(g) {
-    var rows = g.warns.map(function (w) {
-      return "<tr><td>" + esc(w.name) + '<div class="muted">' + esc(w.id) + "</div></td><td>" + w.count + "</td><td>" + esc(w.last) +
-        '</td><td><button class="btn small danger" data-action="clear-warn" data-id="' + esc(w.id) + '">Clear</button></td></tr>';
-    }).join("");
-    var bannedRows = g.banned.map(function (u) {
-      return "<tr><td>" + esc(u.name) + '<div class="muted">' + esc(u.id) + "</div></td><td>" + esc(u.reason) +
-        '</td><td><button class="btn small danger" data-action="unban" data-id="' + esc(u.id) + '">Unban</button></td></tr>';
-    }).join("");
-    return '<div class="banner">★ Connected to your bot — this is live data.</div>' +
-      '<div class="head"><div class="gl"><div class="av">' + esc(g.name[0]) + '</div><div><h2 style="margin:0">' + esc(g.name) + '</h2></div></div><a class="btn ghost small" href="#/dashboard">← Servers</a></div>' +
-      '<div class="stats">' +
-        '<div class="card stat"><span class="muted">Members</span><b>' + g.members.toLocaleString() + "</b></div>" +
-        '<div class="card stat"><span class="muted">Text channels</span><b>' + g.text.length + "</b></div>" +
-        '<div class="card stat"><span class="muted">Voice channels</span><b>' + g.voice.length + "</b></div>" +
-        '<div class="card stat"><span class="muted">Total warnings</span><b>' + totalWarns(g) + "</b></div>" +
-        '<div class="card stat"><span class="muted">Banned users</span><b>' + g.banned.length + "</b></div></div>" +
-      '<div class="two">' +
-        '<div class="card"><h3 style="margin:0 0 4px;font-size:22px">Mod logs</h3><span class="muted">Where kicks, bans, timeouts and warns are logged.</span>' +
-          '<select id="logSel">' + options(g.text, g.log, "None (off)", "# ") + '</select><button class="btn small" data-action="save-log">Save</button></div>' +
-        '<div class="card"><h3 style="margin:0 0 4px;font-size:22px">24/7 voice</h3><span class="status ' + (g.vc ? "on" : "") + '">' + (g.vc ? "Connected to " + esc(g.vc) : "Not connected") + "</span>" +
-          '<select id="vcSel">' + options(g.voice, g.vc || g.voice[0], "", "🔊 ") + '</select><div class="row"><button class="btn small" data-action="join-vc">Join &amp; save</button>' +
-          (g.vc ? '<button class="btn small danger" data-action="leave-vc">Leave</button>' : "") + "</div></div></div>" +
-      '<div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 4px;font-size:22px">Say something</h3><span class="muted">Pick a channel and send a message as the bot.</span>' +
-        '<select id="sayChannel">' + options(g.text, g.text[0], "", "# ") + '</select>' +
-        '<input id="sayMessage" placeholder="Message" style="width:100%;padding:11px 12px;border-radius:12px;background:#000;color:#fff;border:2px solid var(--line);margin:0 0 14px">' +
-        '<button class="btn small" data-action="do-say">Send</button></div>' +
-      '<div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 4px;font-size:22px">Warn a user</h3><span class="muted">Enter who to warn and what to say.</span>' +
-        '<input id="warnName" placeholder="Username" style="width:100%;padding:11px 12px;border-radius:12px;background:#000;color:#fff;border:2px solid var(--line);margin:10px 0">' +
-        '<input id="warnReason" placeholder="Reason" style="width:100%;padding:11px 12px;border-radius:12px;background:#000;color:#fff;border:2px solid var(--line);margin:0 0 14px">' +
-        '<button class="btn small" data-action="add-warn">Warn</button></div>' +
-      '<div class="card" style="margin-bottom:16px"><h3 style="margin:0 0 10px;font-size:22px">Warnings</h3>' +
-        (rows ? '<div class="tscroll"><table><tr><th>User</th><th>Count</th><th>Last reason</th><th></th></tr>' + rows + "</table></div>" : '<span class="muted">No warnings in this server yet.</span>') + "</div>" +
-      '<div class="card"><h3 style="margin:0 0 10px;font-size:22px">Banned users</h3>' +
-        (bannedRows ? '<div class="tscroll"><table><tr><th>User</th><th>Reason</th><th></th></tr>' + bannedRows + "</table></div>" : '<span class="muted">No banned users in this server.</span>') + "</div>";
-  }
-
-  function currentGuildId() { return location.hash.split("/")[2]; }
-  function renderDashRoot(html) { document.getElementById("dashRoot").innerHTML = html; }
-
-  function refreshGuildView(id) {
-    renderDashRoot('<div class="banner">★ Loading…</div>');
-    loadGuildDetail(id).then(function (g) { renderDashRoot(dashGuild(g)); }).catch(function (e) {
-      renderDashRoot('<div class="banner">★ Could not load this server (' + esc(e.message) + ').</div><a class="btn ghost small" href="#/dashboard">← Servers</a>');
-    });
-  }
-
-  // ---------- router ----------
-  function show(name) {
-    ["landing", "login", "dash"].forEach(function (v) { document.getElementById("view-" + v).hidden = v !== name; });
-  }
-  function route() {
-    var h = location.hash || "";
-    renderNav();
-    if (h.indexOf("#/login") === 0) {
-      if (state.user) { location.hash = "#/dashboard"; return; }
-      show("login"); window.scrollTo(0, 0);
-    } else if (h.indexOf("#/dashboard") === 0) {
-      if (!state.user) { location.hash = "#/login"; return; }
-      show("dash");
-      var id = h.split("/")[2];
-      if (id) {
-        refreshGuildView(id);
-      } else {
-        renderDashRoot('<div class="banner">★ Loading…</div>');
-        loadGuilds().then(function () { renderDashRoot(dashList()); }).catch(function (e) {
-          renderDashRoot('<div class="banner">★ Could not load your servers (' + esc(e.message) + ').</div>');
-        });
-      }
-      window.scrollTo(0, 0);
-    } else {
-      show("landing");
-      if (h.length > 1) { var el = document.getElementById(h.slice(1)); if (el) el.scrollIntoView(); }
-      else window.scrollTo(0, 0);
+  function draw(t) {
+    ctx.clearRect(0, 0, w, h_);
+    for (const s of stars) {
+      const tw = still ? 1 : .6 + .4 * Math.sin(t * s.s + s.p);
+      ctx.globalAlpha = s.a * tw;
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.283); ctx.fill();
     }
-    var links = document.querySelectorAll(".inviteLink");
-    for (var i = 0; i < links.length; i++) if (links[i].getAttribute("href") === "#") links[i].href = INVITE;
-    var ll = document.querySelectorAll(".loginLink");
-    for (var j = 0; j < ll.length; j++) ll[j].href = loginHref();
+    ctx.globalAlpha = 1;
+    if (!still) requestAnimationFrame(draw);
+  }
+  addEventListener("resize", () => { resize(); });
+  resize();
+  if (!still) requestAnimationFrame(draw);
+})();
+
+/* =====================================================================
+   Layout pieces
+   ===================================================================== */
+function header(user) {
+  return h("header", { class: "top" },
+    h("a", { class: "brand", href: "#/dashboard" }, "★ YAN"),
+    user && h("nav", { class: "nav" },
+      h("a", { class: "link", href: "#/dashboard" }, "Dashboard"),
+      h("div", { class: "user" },
+        avatar(user.id, user.username, userAvatar(user)),
+        h("span", { class: "name" }, user.username)),
+      h("button", { class: "btn ghost sm", type: "button", onclick: logout }, "Logout")));
+}
+const footer = () => h("footer", null, "© YAN · Not affiliated with Discord Inc.");
+
+function shell(user, ...content) {
+  $app.replaceChildren(header(user), h("main", null, ...content), footer());
+}
+
+async function logout() {
+  await attempt(() => api("/auth/logout", { method: "POST" }));
+  location.hash = "#/login";
+}
+
+/* =====================================================================
+   Views
+   ===================================================================== */
+
+/* ---------- Login ---------- */
+function viewLogin(query) {
+  const err = query.get("error");
+  const urlInput = h("input", { type: "url", value: getApi(), placeholder: "https://xxxx.ngrok-free.app", id: "api-url" });
+  const go = () => {
+    const v = urlInput.value.trim();
+    if (!/^https:\/\//.test(v)) { toast("The backend URL must start with https://", true); return; }
+    setApi(v);
+    location.href = getApi() + "/auth/login";
+  };
+  $app.replaceChildren(
+    header(null),
+    h("main", null,
+      h("div", { class: "hero" },
+        h("div", { class: "big-star" }, "★"),
+        h("h1", null, "YAN"),
+        h("p", { class: "lead" }, "Manage your Discord servers, warnings and auto replies from one place."),
+        h("div", { class: "login-box panel" },
+          err && h("div", { class: "banner-error" }, errText(err)),
+          h("label", { class: "field", for: "api-url" },
+            h("span", null, "Bot backend URL"),
+            urlInput,
+            h("span", { class: "muted small", style: "font-weight:400;margin-top:6px" },
+              "Changes every time the bot restarts, unless you use an ngrok static domain. Saved in this browser.")),
+          h("button", { class: "btn", type: "button", style: "width:100%", onclick: go }, "Login with Discord")))),
+    footer());
+}
+
+/* ---------- Dashboard: servers menu ---------- */
+async function viewDashboard() {
+  shell(null, h("p", { class: "muted" }, "Loading your servers…"));
+  let user, guilds;
+  try { [user, guilds] = await Promise.all([api("/api/me"), api("/api/guilds")]); }
+  catch (e) { return failView(e); }
+
+  const grid = h("ul", { class: "servers-grid" });
+  for (const g of guilds) {
+    const iconUrl = guildIcon(g);
+    const card = h("li", { class: "server-card", style: `--hue:${hueOf(g.id)}` },
+      h("div", { class: "server-banner" }, g.owner && h("span", { class: "server-owner" }, "Owner")),
+      avatar(g.id, g.name, iconUrl),
+      h("h3", { class: "server-name", title: g.name }, g.name),
+      h("p", { class: "server-meta" }, g.bot ? `${g.members ?? "?"} members` : "Bot not added"),
+      g.bot
+        ? h("a", { class: "btn", href: `#/server/${g.id}` }, "Manage")
+        : h("a", {
+            class: "btn ghost", target: "_blank", rel: "noopener",
+            href: `https://discord.com/oauth2/authorize?client_id=${CONFIG.CLIENT_ID}&scope=bot%20applications.commands&permissions=8&guild_id=${g.id}&disable_guild_select=true`,
+          }, "Invite"));
+    grid.append(card);
   }
 
-  var toastTimer;
-  function toast(msg) {
-    var t = document.getElementById("toast");
-    t.textContent = msg; t.classList.add("show");
-    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2200);
-  }
+  shell(user,
+    h("h1", { style: "margin-bottom:6px" }, "Your servers"),
+    h("p", { class: "muted", style: "margin-bottom:22px" }, "Servers where you can manage things. Pick one to open its settings."),
+    guilds.length ? grid : h("div", { class: "dashed" }, "No servers found. You need the Manage Server permission in a server to see it here."));
+}
 
-  document.addEventListener("click", function (e) {
-    var b = e.target.closest("[data-action]");
-    if (!b) return;
-    var a = b.getAttribute("data-action");
+function failView(e) {
+  if (e.code === "not_logged_in") { location.hash = "#/login"; return; }
+  shell(null,
+    h("div", { class: "panel" },
+      h("h2", null, "Something went wrong"),
+      h("p", { class: "muted", style: "margin-bottom:16px" }, errText(e.code)),
+      h("div", { class: "row" },
+        h("button", { class: "btn", type: "button", onclick: () => route() }, "Try again"),
+        h("a", { class: "btn ghost", href: "#/login" }, "Change backend URL"))));
+}
 
-    if (a === "real-login") { e.preventDefault(); window.location.href = BACKEND_URL + "/auth/login"; return; }
+/* ---------- Server page ---------- */
+const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"]];
 
-    if (a === "logout") {
-      e.preventDefault();
-      api("/auth/logout", { method: "POST" }).catch(function () {}).then(function () {
-        state.user = null; state.guilds = []; state.guildCache = {};
-        location.hash = "#/"; route();
-      });
-      return;
-    }
+async function viewServer(id, tab = "overview") {
+  shell(null, h("p", { class: "muted" }, "Loading server…"));
+  let user, data;
+  try { [user, data] = await Promise.all([api("/api/me"), api(`/api/guilds/${id}`)]); }
+  catch (e) { return failView(e); }
 
-    var id = currentGuildId();
-    if (!id) return;
+  const body = h("div");
+  shell(user,
+    h("a", { class: "crumb", href: "#/dashboard" }, "← All servers"),
+    h("div", { class: "server-head" },
+      avatar(id, data.name, guildIcon({ id, icon: data.icon })),
+      h("div", null, h("h1", null, data.name), h("p", { class: "muted" }, `${data.members} members`))),
+    h("nav", { class: "tabs", "aria-label": "Server sections" },
+      TABS.map(([key, label]) =>
+        h("a", { class: "tab" + (key === tab ? " active" : ""), href: `#/server/${id}/${key}`, "aria-current": key === tab ? "page" : null }, label))),
+    body);
 
-    if (a === "save-log") {
-      var logVal = document.getElementById("logSel").value;
-      api("/api/guilds/" + id + "/log", { method: "POST", body: { channel: logVal } })
-        .then(function () { toast(logVal ? "Log channel saved: #" + logVal : "Mod logs turned off."); refreshGuildView(id); })
-        .catch(function (err) { toast("Error: " + err.message); });
+  const refresh = () => viewServer(id, tab);
+  if (tab === "overview") renderOverview(body, id, data, refresh);
+  else if (tab === "say") renderSay(body, id, data);
+  else if (tab === "moderation") renderModeration(body, id, data, refresh);
+  else if (tab === "autoreply") await renderAutoReply(body, id);
+}
+
+function channelSelect(names, current, noneLabel) {
+  const sel = h("select", null, h("option", { value: "" }, noneLabel), names.map((n) => h("option", { value: n }, n)));
+  sel.value = names.includes(current) ? current : "";
+  return sel;
+}
+
+function renderOverview(body, id, d, refresh) {
+  const logSel = channelSelect(d.text, d.log, "No log channel");
+  const vcSel = channelSelect(d.voice, d.vc, "Pick a voice channel");
+  body.append(
+    h("div", { class: "stat-row" },
+      h("div", { class: "stat" }, h("b", null, d.members), "members"),
+      h("div", { class: "stat" }, h("b", null, d.text.length), "text channels"),
+      h("div", { class: "stat" }, h("b", null, d.voice.length), "voice channels"),
+      h("div", { class: "stat" }, h("b", null, d.warns.length), "members warned")),
+    h("div", { class: "grid-2" },
+      h("div", { class: "panel" },
+        h("h2", null, "Log channel"),
+        h("p", { class: "muted small", style: "margin-bottom:14px" }, "Where the bot posts moderation logs."),
+        h("label", { class: "field" }, h("span", null, "Channel"), logSel),
+        h("button", { class: "btn", type: "button", onclick: async () => {
+          await attempt(() => api(`/api/guilds/${id}/log`, { method: "POST", body: { channel: logSel.value } }), "Log channel saved");
+        } }, "Save log channel")),
+      h("div", { class: "panel" },
+        h("h2", null, "Voice channel"),
+        h("p", { class: "muted small", style: "margin-bottom:14px" },
+          d.vc ? `The bot stays in ${d.vc}.` : "The bot isn't sitting in a voice channel."),
+        h("label", { class: "field" }, h("span", null, "Channel"), vcSel),
+        h("div", { class: "row" },
+          h("button", { class: "btn", type: "button", onclick: async () => {
+            if (!vcSel.value) return toast("Pick a voice channel first.", true);
+            if (await attempt(() => api(`/api/guilds/${id}/voice/join`, { method: "POST", body: { channel: vcSel.value } }), "Joining voice channel")) refresh();
+          } }, "Join"),
+          h("button", { class: "btn ghost", type: "button", onclick: async () => {
+            if (await attempt(() => api(`/api/guilds/${id}/voice/leave`, { method: "POST", body: {} }), "Left voice channel")) refresh();
+          } }, "Leave")))));
+}
+
+function renderModeration(body, id, d, refresh) {
+  const user = h("input", { type: "text", placeholder: "Username or @name", maxlength: "64" });
+  const reason = h("input", { type: "text", placeholder: "Reason", maxlength: "300" });
+  body.append(h("div", { class: "grid-2" },
+    h("div", { class: "panel" },
+      h("h2", null, "Warn a member"),
+      h("label", { class: "field" }, h("span", null, "Member"), user),
+      h("label", { class: "field" }, h("span", null, "Reason"), reason),
+      h("button", { class: "btn", type: "button", onclick: async () => {
+        if (!user.value.trim() || !reason.value.trim()) return toast(errText("missing_fields"), true);
+        if (await attempt(() => api(`/api/guilds/${id}/warn`, { method: "POST", body: { username: user.value.trim(), reason: reason.value.trim() } }), "Warning sent")) refresh();
+      } }, "Send warning"),
+      h("h3", { style: "margin-top:26px" }, "Warnings"),
+      d.warns.length
+        ? h("ul", { class: "list" }, d.warns.map((w) =>
+            h("li", null,
+              h("div", { class: "grow" }, h("div", null, w.name), h("div", { class: "muted small" }, w.last || "No reason")),
+              h("span", { class: "chip" }, `${w.count} warn${w.count === 1 ? "" : "s"}`))))
+        : h("p", { class: "empty" }, "No warnings yet.")),
+    h("div", { class: "panel" },
+      h("h2", null, "Banned members"),
+      d.banned.length
+        ? h("ul", { class: "list" }, d.banned.map((b) =>
+            h("li", null,
+              h("div", { class: "grow" }, h("div", null, b.name), h("div", { class: "muted small" }, b.reason)),
+              h("button", { class: "btn ghost sm", type: "button", onclick: async () => {
+                if (!confirm(`Unban ${b.name}?`)) return;
+                if (await attempt(() => api(`/api/guilds/${id}/unban`, { method: "POST", body: { userId: b.id } }), "Unbanned")) refresh();
+              } }, "Unban"))))
+        : h("p", { class: "empty" }, "Nobody is banned.")))); 
+}
+
+/* ---------- Send message (text + photos to a channel) ---------- */
+function renderSay(body, id, d) {
+  const MAX_IMAGES = 4;
+  const chan = h("select", null, h("option", { value: "" }, "Select a channel"), d.text.map((n) => h("option", { value: n }, "#" + n)));
+  const message = h("textarea", { placeholder: "Write your message…", maxlength: "4000", style: "min-height:140px" });
+  const asEmbed = h("input", { type: "checkbox" });
+  const title = h("input", { type: "text", placeholder: "Embed title (optional)", maxlength: "256" });
+  const color = h("input", { type: "color", value: "#5865f2" });
+  const embedFields = h("div", { hidden: true },
+    h("label", { class: "field" }, h("span", null, "Title"), title),
+    h("div", { class: "row", style: "margin-bottom:14px" }, h("span", { style: "font-weight:600" }, "Colour"), color));
+  asEmbed.addEventListener("change", () => { embedFields.hidden = !asEmbed.checked; });
+
+  let images = []; // [{ dataUrl, size }]
+  const fileInput = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", multiple: true, hidden: true });
+  const imgBox = h("div");
+  const drawImages = () => {
+    const parts = [];
+    if (images.length) {
+      parts.push(h("div", { class: "thumbs" }, images.map((im, i) =>
+        h("div", { class: "thumb" },
+          h("img", { src: im.dataUrl, alt: `Photo ${i + 1}` }),
+          h("button", { type: "button", "aria-label": `Remove photo ${i + 1}`, onclick: () => { images.splice(i, 1); drawImages(); } }, "×")))));
     }
-    if (a === "join-vc") {
-      var vcVal = document.getElementById("vcSel").value;
-      api("/api/guilds/" + id + "/voice/join", { method: "POST", body: { channel: vcVal } })
-        .then(function () { toast("Joined " + vcVal + "."); refreshGuildView(id); })
-        .catch(function (err) { toast("Error: " + err.message); });
+    if (images.length < MAX_IMAGES) {
+      parts.push(h("div", { class: "drop", tabindex: "0", role: "button", onclick: () => fileInput.click(),
+        onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fileInput.click(); } } },
+        h("strong", null, images.length ? "Add another photo" : "Click to upload photos"),
+        h("span", { class: "muted small" }, `Up to ${MAX_IMAGES} photos · PNG, JPG, GIF or WEBP · 5MB each`)));
     }
-    if (a === "leave-vc") {
-      api("/api/guilds/" + id + "/voice/leave", { method: "POST" })
-        .then(function () { toast("Left the voice channel."); refreshGuildView(id); })
-        .catch(function (err) { toast("Error: " + err.message); });
+    imgBox.replaceChildren(...parts);
+  };
+  fileInput.addEventListener("change", async () => {
+    const picked = [...fileInput.files].slice(0, MAX_IMAGES - images.length);
+    fileInput.value = "";
+    for (const f of picked) {
+      if (!/^image\/(png|jpe?g|gif|webp)$/.test(f.type)) { toast(errText("invalid_image"), true); continue; }
+      if (f.size > 5 * 1024 * 1024) { toast(`${f.name}: ${errText("file_too_large")}`, true); continue; }
+      const dataUrl = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(f); });
+      images.push({ dataUrl, size: f.size });
     }
-    if (a === "clear-warn") {
-      api("/api/guilds/" + id + "/warn/clear", { method: "POST", body: { userId: b.getAttribute("data-id") } })
-        .then(function () { toast("Warnings cleared."); refreshGuildView(id); })
-        .catch(function (err) { toast("Error: " + err.message); });
-    }
-    if (a === "unban") {
-      api("/api/guilds/" + id + "/unban", { method: "POST", body: { userId: b.getAttribute("data-id") } })
-        .then(function () { toast("User has been unbanned."); refreshGuildView(id); })
-        .catch(function (err) { toast("Error: " + err.message); });
-    }
-    if (a === "add-warn") {
-      var nameEl = document.getElementById("warnName"), reasonEl = document.getElementById("warnReason");
-      var name = nameEl.value.trim(), reason = reasonEl.value.trim();
-      if (!name || !reason) { toast("Enter a username and a reason."); return; }
-      api("/api/guilds/" + id + "/warn", { method: "POST", body: { username: name, reason: reason } })
-        .then(function () { toast("Warned " + name + "."); refreshGuildView(id); })
-        .catch(function (err) { toast("Error: " + err.message); });
-    }
-    if (a === "do-say") {
-      var chEl = document.getElementById("sayChannel"), msgEl = document.getElementById("sayMessage");
-      var ch = chEl.value, msg = msgEl.value.trim();
-      if (!msg) { toast("Type a message first."); return; }
-      api("/api/guilds/" + id + "/say", { method: "POST", body: { channel: ch, message: msg } })
-        .then(function () { toast("Sent to #" + ch + "."); msgEl.value = ""; })
-        .catch(function (err) { toast("Error: " + err.message); });
-    }
+    if (images.reduce((s, i) => s + i.size, 0) > 10 * 1024 * 1024) toast(errText("total_too_large"), true);
+    drawImages();
   });
+  drawImages();
 
-  window.addEventListener("hashchange", route);
-  loadMe().then(route);
+  const send = h("button", { class: "btn", type: "button" }, "Send message");
+  send.onclick = async () => {
+    if (!chan.value) return toast("Pick a channel first.", true);
+    if (!message.value.trim() && !images.length) return toast(errText("empty_message"), true);
+    send.disabled = true;
+    const ok = await attempt(() => api(`/api/guilds/${id}/say`, { method: "POST", body: {
+      channel: chan.value,
+      message: message.value,
+      images: images.map((i) => i.dataUrl),
+      asEmbed: asEmbed.checked,
+      title: title.value,
+      color: color.value,
+    } }), `Message sent to #${chan.value}`);
+    send.disabled = false;
+    if (ok) { message.value = ""; title.value = ""; images = []; drawImages(); }
+  };
 
-  // ---------- white star cursor ----------
-  (function () {
-    var fine = window.matchMedia("(pointer: fine)").matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!fine) return;
-    document.documentElement.classList.add("cursor-on");
-    var wrap = document.getElementById("cursor");
-    var svg = '<svg viewBox="0 0 24 24" width="100%" height="100%"><polygon fill="#fff" points="12,1.5 15.2,8.3 22.5,9.2 17.1,14.3 18.5,21.7 12,18.1 5.5,21.7 6.9,14.3 1.5,9.2 8.8,8.3"/></svg>';
-    var N = 7, stars = [];
-    for (var i = 0; i < N; i++) {
-      var el = document.createElement("div"); el.className = "star"; el.innerHTML = svg;
-      var size = i === 0 ? 14 : Math.max(3, 9 - i);
-      el.style.width = el.style.height = size + "px";
-      el.style.opacity = i === 0 ? 1 : Math.max(0.1, 0.6 - i * 0.08);
-      wrap.appendChild(el); stars.push({ el: el, x: -100, y: -100, size: size });
+  body.append(h("div", { class: "panel", style: "max-width:720px" },
+    h("h2", null, "Send a message"),
+    h("p", { class: "muted small", style: "margin-bottom:16px" },
+      "The bot posts this in the channel you pick. Mentions like @everyone won't ping from here."),
+    h("label", { class: "field" }, h("span", null, "Channel"), chan),
+    h("label", { class: "field" }, h("span", null, "Message"), message),
+    h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Photos"), imgBox, fileInput),
+    h("div", { class: "toggle-row" },
+      h("div", null, h("div", { style: "font-weight:600" }, "Send as embed"), h("div", { class: "muted small" }, "Shows the text in an embed, with your first photo inside it")),
+      h("label", { class: "switch" }, asEmbed, h("i"))),
+    embedFields,
+    send));
+}
+
+/* ---------- Auto reply ---------- */
+async function renderAutoReply(body, id) {
+  let rules, embeds;
+  try { [rules, embeds] = await Promise.all([api(`/api/guilds/${id}/autoreplies`), api(`/api/guilds/${id}/embeds`)]); }
+  catch (e) { return failView(e); }
+  const refresh = () => viewServer(id, "autoreply");
+
+  const cards = h("div", { class: "cards-grid" }, rules.map((r) =>
+    h("div", { class: "ar-card" },
+      h("div", { class: "row between", style: "flex-wrap:nowrap" },
+        h("div", { class: "ar-trigger" }, r.trigger),
+        h("div", { class: "row", style: "flex-wrap:nowrap" },
+          h("button", { class: "btn ghost sm", type: "button", onclick: () => openAutoReplyModal(id, embeds, r, refresh) }, "Edit"),
+          h("button", { class: "btn danger sm", type: "button", onclick: async () => {
+            if (!confirm("Delete this auto reply?")) return;
+            if (await attempt(() => api(`/api/guilds/${id}/autoreplies/${r.id}`, { method: "DELETE" }), "Deleted")) refresh();
+          } }, "Delete"))),
+      r.message && h("p", { class: "msg" }, r.message),
+      h("div", { class: "chips" },
+        h("span", { class: "chip" }, r.match === "exact" ? "Exact match" : "Contains"),
+        r.mention && h("span", { class: "chip" }, "Mentions user"),
+        r.hasAttachment && h("span", { class: "chip" }, "Image"),
+        r.embedId && h("span", { class: "chip" }, "Embed")))));
+
+  body.append(
+    h("div", { class: "row between", style: "margin-bottom:18px" },
+      h("div", null, h("h2", { style: "margin-bottom:4px" }, "Auto reply"),
+        h("p", { class: "muted" }, "Reply automatically when someone sends a specific word or phrase.")),
+      h("button", { class: "btn", type: "button", onclick: () => openAutoReplyModal(id, embeds, null, refresh) }, "+ Add auto reply")),
+    rules.length ? cards : h("div", { class: "dashed" }, "No auto replies yet. Add one to get started."),
+    embedsPanel(id, embeds, refresh));
+}
+
+function embedsPanel(id, embeds, refresh) {
+  const name = h("input", { type: "text", placeholder: "Name (only you see this)", maxlength: "80" });
+  const title = h("input", { type: "text", placeholder: "Embed title", maxlength: "256" });
+  const desc = h("textarea", { placeholder: "Embed text. You can use {user} and {server}.", maxlength: "4000", style: "min-height:80px" });
+  const color = h("input", { type: "color", value: "#5865f2" });
+  return h("div", { class: "panel", style: "margin-top:28px" },
+    h("h2", null, "Embeds"),
+    h("p", { class: "muted small", style: "margin-bottom:16px" }, "Create an embed here, then pick it when you add or edit an auto reply."),
+    h("div", { class: "grid-2" },
+      h("div", null,
+        h("label", { class: "field" }, h("span", null, "Name"), name),
+        h("label", { class: "field" }, h("span", null, "Title"), title),
+        h("label", { class: "field" }, h("span", null, "Text"), desc),
+        h("div", { class: "row", style: "margin-bottom:14px" }, h("span", { style: "font-weight:600" }, "Colour"), color),
+        h("button", { class: "btn", type: "button", onclick: async () => {
+          if (!name.value.trim()) return toast(errText("missing_name"), true);
+          if (await attempt(() => api(`/api/guilds/${id}/embeds`, { method: "POST", body: { name: name.value, title: title.value, description: desc.value, color: color.value } }), "Embed created")) refresh();
+        } }, "Create embed")),
+      h("div", null,
+        h("h3", null, "Your embeds"),
+        embeds.length
+          ? h("ul", { class: "list" }, embeds.map((e) =>
+              h("li", null,
+                h("div", { class: "grow" }, h("div", null, e.name), h("div", { class: "muted small" }, e.title || "No title")),
+                h("button", { class: "btn danger sm", type: "button", onclick: async () => {
+                  if (!confirm(`Delete the embed "${e.name}"?`)) return;
+                  if (await attempt(() => api(`/api/guilds/${id}/embeds/${e.id}`, { method: "DELETE" }), "Embed deleted")) refresh();
+                } }, "Delete"))))
+          : h("p", { class: "empty" }, "No embeds yet."))));
+}
+
+function openAutoReplyModal(id, embeds, existing, done) {
+  const editing = !!existing;
+  const trigger = h("input", { type: "text", placeholder: "Enter the trigger word or phrase…", maxlength: "200", value: existing?.trigger || "" });
+  const message = h("textarea", { placeholder: "Enter the reply message… ({user} and {server} work here)", maxlength: "2000" });
+  message.value = existing?.message || "";
+  const mention = h("input", { type: "checkbox", checked: !!existing?.mention, id: "ar-mention" });
+  const match = h("select", null, h("option", { value: "contains" }, "Contains the trigger"), h("option", { value: "exact" }, "Exactly the trigger"));
+  match.value = existing?.match === "exact" ? "exact" : "contains";
+  const embedSel = h("select", null, h("option", { value: "" }, "Select an embed (optional)"), embeds.map((e) => h("option", { value: e.id }, e.name)));
+  embedSel.value = existing?.embedId && embeds.some((e) => e.id === existing.embedId) ? existing.embedId : "";
+
+  // attachment: undefined = keep, null = remove, string = new data URL
+  let attachment = undefined;
+  let hasCurrent = !!existing?.hasAttachment;
+  const fileInput = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true });
+  const attachBox = h("div");
+  const drawAttach = () => {
+    let content;
+    if (typeof attachment === "string") {
+      content = h("div", { class: "toggle-row" }, h("span", null, "New image ready to upload"),
+        h("button", { class: "btn ghost sm", type: "button", onclick: () => { attachment = undefined; drawAttach(); } }, "Remove"));
+    } else if (hasCurrent && attachment !== null) {
+      content = h("div", { class: "toggle-row" }, h("span", null, "This auto reply has an image"),
+        h("button", { class: "btn danger sm", type: "button", onclick: () => { attachment = null; drawAttach(); } }, "Remove image"));
+    } else {
+      content = h("div", { class: "drop", tabindex: "0", role: "button", onclick: () => fileInput.click(),
+        onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fileInput.click(); } } },
+        h("strong", null, "Click to upload image"), h("span", { class: "muted small" }, "PNG, JPG, GIF or WEBP · maximum 5MB"));
     }
-    var mx = -100, my = -100, seen = false, rot = 0, scale = 1, target = 1;
-    window.addEventListener("mousemove", function (e) {
-      mx = e.clientX; my = e.clientY;
-      if (!seen) { seen = true; stars.forEach(function (s) { s.x = mx; s.y = my; }); wrap.style.opacity = 1; }
-      target = e.target.closest && e.target.closest("a,button,select,input,.card") ? 1.6 : 1;
-    });
-    document.addEventListener("mouseleave", function () { wrap.style.opacity = 0; });
-    document.addEventListener("mouseenter", function () { if (seen) wrap.style.opacity = 1; });
-    (function tick() {
-      rot += 1.2; scale += (target - scale) * 0.2;
-      var px = mx, py = my;
-      stars.forEach(function (s, i) {
-        var k = i === 0 ? 0.5 : 0.34;
-        s.x += (px - s.x) * k; s.y += (py - s.y) * k; px = s.x; py = s.y;
-        s.el.style.transform = "translate3d(" + (s.x - s.size / 2) + "px," + (s.y - s.size / 2) + "px,0) rotate(" + (i === 0 ? rot : -rot) + "deg) scale(" + (i === 0 ? scale : 1) + ")";
-      });
-      requestAnimationFrame(tick);
-    })();
-  })();
+    attachBox.replaceChildren(content);
+  };
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files[0];
+    fileInput.value = "";
+    if (!f) return;
+    if (!/^image\/(png|jpe?g|gif|webp)$/.test(f.type)) return toast(errText("invalid_image"), true);
+    if (f.size > 5 * 1024 * 1024) return toast(errText("file_too_large"), true);
+    const fr = new FileReader();
+    fr.onload = () => { attachment = fr.result; drawAttach(); };
+    fr.readAsDataURL(f);
+  });
+  drawAttach();
+
+  const close = () => overlay.remove();
+  const save = h("button", { class: "btn", type: "button" }, editing ? "Save" : "Create");
+  save.onclick = async () => {
+    if (!trigger.value.trim()) return toast(errText("missing_trigger"), true);
+    const payload = { trigger: trigger.value, message: message.value, mention: mention.checked, match: match.value, embedId: embedSel.value || null };
+    if (attachment !== undefined) payload.attachment = attachment;
+    save.disabled = true;
+    const ok = await attempt(
+      () => api(editing ? `/api/guilds/${id}/autoreplies/${existing.id}` : `/api/guilds/${id}/autoreplies`, { method: editing ? "PUT" : "POST", body: payload }),
+      editing ? "Auto reply saved" : "Auto reply created");
+    save.disabled = false;
+    if (ok) { close(); done(); }
+  };
+
+  const overlay = h("div", { class: "overlay", onclick: (ev) => { if (ev.target === overlay) close(); } },
+    h("div", { class: "modal", role: "dialog", "aria-modal": "true", "aria-label": editing ? "Edit auto reply" : "Create auto reply" },
+      h("h2", null, editing ? "Edit auto reply" : "Create auto reply"),
+      h("p", { class: "muted", style: "margin-bottom:18px" }, "Configure automatic responses for specific triggers."),
+      h("label", { class: "field" }, h("span", null, "Trigger *"), trigger),
+      h("label", { class: "field" }, h("span", null, "Match"), match),
+      h("label", { class: "field" }, h("span", null, "Message"), message),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Mention user"), h("div", { class: "muted small" }, "Mention the user who triggered the auto reply")),
+        h("label", { class: "switch" }, mention, h("i"))),
+      h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Attachment"), attachBox, fileInput),
+      h("label", { class: "field" }, h("span", null, "Embed"), embedSel),
+      h("div", { class: "actions" }, h("button", { class: "btn ghost", type: "button", onclick: close }, "Cancel"), save)));
+  document.body.append(overlay);
+  trigger.focus();
+  overlay.addEventListener("keydown", (ev) => { if (ev.key === "Escape") close(); });
+}
+
+/* =====================================================================
+   Router
+   ===================================================================== */
+function route() {
+  document.querySelectorAll(".overlay").forEach((o) => o.remove());
+  const [pathPart, queryPart = ""] = (location.hash.slice(1) || "/login").split("?");
+  const parts = pathPart.split("/").filter(Boolean);
+  const query = new URLSearchParams(queryPart);
+  scrollTo(0, 0);
+
+  if (parts[0] === "login") return viewLogin(query);
+  if (parts[0] === "dashboard") return viewDashboard();
+  if (parts[0] === "server" && parts[1]) return viewServer(parts[1], TABS.some(([k]) => k === parts[2]) ? parts[2] : "overview");
+  location.hash = "#/dashboard";
+}
+addEventListener("hashchange", route);
+route();
 </script>
 </body>
 </html>
