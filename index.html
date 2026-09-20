@@ -179,7 +179,9 @@
   .thumb button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
   /* ---------- toasts ---------- */
-  #toasts { position: fixed; right: 16px; bottom: 16px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+  /* Top-right on purpose — bottom-right is where Netlify's own "Powered by Netlify"
+     badge sits on the free tier, and it was covering these. */
+  #toasts { position: fixed; right: 16px; top: 16px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
   .toast { background: var(--card-2); border: 1px solid var(--line); border-left: 4px solid var(--ok); border-radius: 10px; padding: 10px 16px; max-width: 340px; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
   .toast.err { border-left-color: var(--danger); }
 
@@ -278,6 +280,10 @@ const ERRORS = {
   bot_missing_permission: "The bot can't post there. Give it View Channel, Send Messages, Attach Files and Embed Links in that channel.",
   send_failed: "Discord rejected the message. Check the bot's permissions in that channel.",
   missing_code: "Discord didn't return a login code. Try again.",
+  missing_manage_messages: "The bot needs View Channel, Manage Messages and Read Message History in that channel.",
+  purge_failed: "Couldn't delete those messages — they might be older than 14 days, which Discord won't let bots bulk-delete.",
+  no_jail_role: "Pick and save a jail role first.",
+  missing_manage_roles: "The bot needs the Manage Roles permission, and its own role must sit above the jail role and the member's other roles.",
 };
 const errText = (code) => ERRORS[code] || `Something went wrong (${code}).`;
 
@@ -583,7 +589,7 @@ async function viewServer(id, tab = "overview") {
   const refresh = () => viewServer(id, tab);
   if (tab === "overview") renderOverview(body, id, data, refresh);
   else if (tab === "say") renderSay(body, id, data);
-  else if (tab === "moderation") renderModeration(body, id, data, refresh);
+  else if (tab === "moderation") await renderModeration(body, id, data, refresh);
   else if (tab === "autoreply") await renderAutoReply(body, id);
   else if (tab === "welcome") await renderWelcome(body, id, data);
   else if (tab === "leveling") await renderLeveling(body, id, data);
@@ -633,36 +639,163 @@ function renderOverview(body, id, d, refresh) {
           } }, "Leave")))));
 }
 
-function renderModeration(body, id, d, refresh) {
+function imageSlot({ hasExisting, onFile }) {
+  const fileInput = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true });
+  const box = h("div");
+  let value; // undefined = keep, null = remove, dataUrl = replace
+  let has = hasExisting;
+  const draw = () => {
+    let content;
+    if (typeof value === "string") {
+      content = h("div", { class: "toggle-row" }, h("span", null, "New GIF/image ready to upload"),
+        h("button", { class: "btn ghost sm", type: "button", onclick: () => { value = undefined; draw(); } }, "Remove"));
+    } else if (has && value !== null) {
+      content = h("div", { class: "toggle-row" }, h("span", null, "Sending a GIF/image with this DM"),
+        h("button", { class: "btn danger sm", type: "button", onclick: () => { value = null; draw(); } }, "Remove image"));
+    } else {
+      content = h("div", { class: "drop", tabindex: "0", role: "button", onclick: () => fileInput.click(),
+        onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fileInput.click(); } } },
+        h("strong", null, "Click to add a GIF or image"), h("span", { class: "muted small" }, "PNG, JPG, GIF or WEBP · maximum 5MB"));
+    }
+    box.replaceChildren(content);
+  };
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files[0];
+    fileInput.value = "";
+    if (!f) return;
+    if (!/^image\/(png|jpe?g|gif|webp)$/.test(f.type)) return toast(errText("invalid_image"), true);
+    if (f.size > 5 * 1024 * 1024) return toast(errText("file_too_large"), true);
+    const fr = new FileReader();
+    fr.onload = () => { value = fr.result; draw(); onFile?.(); };
+    fr.readAsDataURL(f);
+  });
+  draw();
+  return { box, fileInput, get value() { return value; } };
+}
+
+async function renderModeration(body, id, d, refresh) {
+  let jail, modMsg;
+  try { [jail, modMsg] = await Promise.all([api(`/api/guilds/${id}/jail`), api(`/api/guilds/${id}/mod-messages`)]); }
+  catch (e) { return failView(e); }
+
   const user = h("input", { type: "text", placeholder: "Username or @name", maxlength: "64" });
   const reason = h("input", { type: "text", placeholder: "Reason", maxlength: "300" });
-  body.append(h("div", { class: "grid-2" },
-    h("div", { class: "panel" },
-      h("h2", null, "Warn a member"),
-      h("label", { class: "field" }, h("span", null, "Member"), user),
-      h("label", { class: "field" }, h("span", null, "Reason"), reason),
-      h("button", { class: "btn", type: "button", onclick: async () => {
-        if (!user.value.trim() || !reason.value.trim()) return toast(errText("missing_fields"), true);
-        if (await attempt(() => api(`/api/guilds/${id}/warn`, { method: "POST", body: { username: user.value.trim(), reason: reason.value.trim() } }), "Warning sent")) refresh();
-      } }, "Send warning"),
-      h("h3", { style: "margin-top:26px" }, "Warnings"),
-      d.warns.length
-        ? h("ul", { class: "list" }, d.warns.map((w) =>
+
+  const warnDmMessage = h("textarea", { placeholder: "You've been warned in {server}.\nReason: {reason}\nWarned by: {mod}", maxlength: "1500", style: "min-height:90px" });
+  warnDmMessage.value = modMsg.warn.message || "";
+  const warnImg = imageSlot({ hasExisting: modMsg.warn.hasImage });
+  const saveWarnDm = h("button", { class: "btn ghost sm", type: "button" }, "Save warn DM");
+  saveWarnDm.onclick = async () => {
+    const payload = { message: warnDmMessage.value };
+    if (warnImg.value !== undefined) payload.image = warnImg.value;
+    await attempt(() => api(`/api/guilds/${id}/mod-messages/warn`, { method: "POST", body: payload }), "Warn DM saved");
+  };
+
+  const jailDmMessage = h("textarea", { placeholder: "You've been jailed in {server}.", maxlength: "1500", style: "min-height:70px" });
+  jailDmMessage.value = modMsg.jail.message || "";
+  const jailImg = imageSlot({ hasExisting: modMsg.jail.hasImage });
+  const saveJailDm = h("button", { class: "btn ghost sm", type: "button" }, "Save jail DM");
+  saveJailDm.onclick = async () => {
+    const payload = { message: jailDmMessage.value };
+    if (jailImg.value !== undefined) payload.image = jailImg.value;
+    await attempt(() => api(`/api/guilds/${id}/mod-messages/jail`, { method: "POST", body: payload }), "Jail DM saved");
+  };
+
+  const purgeChan = h("select", null, h("option", { value: "" }, "Select a channel"), d.text.map((n) => h("option", { value: n }, "#" + n)));
+  const purgeAmount = h("input", { type: "text", inputmode: "numeric", placeholder: "Amount (1-100)", maxlength: "3" });
+  const purgeBtn = h("button", { class: "btn", type: "button" }, "Clear messages");
+  purgeBtn.onclick = async () => {
+    if (!purgeChan.value) return toast("Pick a channel first.", true);
+    const n = parseInt(purgeAmount.value, 10);
+    if (!n || n < 1) return toast("Enter how many messages to clear (1-100).", true);
+    if (!confirm(`Delete the latest ${n} message${n === 1 ? "" : "s"} in #${purgeChan.value}? This can't be undone.`)) return;
+    purgeBtn.disabled = true;
+    const r = await attempt(() => api(`/api/guilds/${id}/purge`, { method: "POST", body: { channel: purgeChan.value, amount: n } }));
+    purgeBtn.disabled = false;
+    if (r) toast(`Deleted ${r.deleted} message${r.deleted === 1 ? "" : "s"} in #${purgeChan.value}`);
+  };
+
+  const jailRoleSel = roleSelect(d.roles || [], jail.roleId, "Select the jail role");
+  const saveJailRole = h("button", { class: "btn ghost sm", type: "button" }, "Save jail role");
+  saveJailRole.onclick = async () => {
+    await attempt(() => api(`/api/guilds/${id}/jail/role`, { method: "POST", body: { role: jailRoleSel.value } }), "Jail role saved");
+  };
+  const jailUser = h("input", { type: "text", placeholder: "Username or @name", maxlength: "64" });
+  const jailBtn = h("button", { class: "btn danger", type: "button" }, "Jail member");
+  jailBtn.onclick = async () => {
+    if (!jailRoleSel.value) return toast(errText("no_jail_role"), true);
+    if (!jailUser.value.trim()) return toast(errText("missing_fields"), true);
+    if (!confirm(`Strip ${jailUser.value.trim()}'s roles and jail them?`)) return;
+    jailBtn.disabled = true;
+    if (await attempt(() => api(`/api/guilds/${id}/jail`, { method: "POST", body: { username: jailUser.value.trim() } }), "Member jailed")) refresh();
+    jailBtn.disabled = false;
+  };
+
+  body.append(
+    h("div", { class: "grid-2" },
+      h("div", { class: "panel" },
+        h("h2", null, "Clear messages"),
+        h("p", { class: "muted small", style: "margin-bottom:14px" }, "Deletes the most recent messages in a channel. Discord won't let bots bulk-delete anything older than 14 days."),
+        h("label", { class: "field" }, h("span", null, "Channel"), purgeChan),
+        h("label", { class: "field" }, h("span", null, "How many (1-100)"), purgeAmount),
+        purgeBtn),
+      h("div", { class: "panel" },
+        h("h2", null, "Jail"),
+        h("p", { class: "muted small", style: "margin-bottom:14px" }, "Jailing strips a member down to just the jail role. Unjailing restores whatever roles they had before."),
+        h("label", { class: "field" }, h("span", null, "Jail role"), jailRoleSel),
+        saveJailRole,
+        h("h3", { style: "margin-top:20px" }, "DM when jailed"),
+        h("p", { class: "muted small", style: "margin-bottom:10px" }, "Sent to the member right after they're jailed. Use {server} in the text."),
+        h("label", { class: "field" }, h("span", null, "Message"), jailDmMessage),
+        h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "GIF / image"), jailImg.box, jailImg.fileInput),
+        saveJailDm,
+        h("h3", { style: "margin-top:20px" }, "Jail a member"),
+        h("label", { class: "field", style: "margin-top:10px" }, h("span", null, "Member"), jailUser),
+        jailBtn)),
+    h("div", { class: "grid-2", style: "margin-top:20px" },
+      h("div", { class: "panel" },
+        h("h2", null, "Warn a member"),
+        h("h3", null, "DM when warned"),
+        h("p", { class: "muted small", style: "margin-bottom:10px" }, "Sent to the member right after they're warned. Use {reason}, {mod} and {server} in the text."),
+        h("label", { class: "field" }, h("span", null, "Message"), warnDmMessage),
+        h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "GIF / image"), warnImg.box, warnImg.fileInput),
+        saveWarnDm,
+        h("h3", { style: "margin-top:20px" }, "Send a warning"),
+        h("label", { class: "field", style: "margin-top:10px" }, h("span", null, "Member"), user),
+        h("label", { class: "field" }, h("span", null, "Reason"), reason),
+        h("button", { class: "btn", type: "button", onclick: async () => {
+          if (!user.value.trim() || !reason.value.trim()) return toast(errText("missing_fields"), true);
+          if (await attempt(() => api(`/api/guilds/${id}/warn`, { method: "POST", body: { username: user.value.trim(), reason: reason.value.trim() } }), "Warning sent")) refresh();
+        } }, "Send warning"),
+        h("h3", { style: "margin-top:26px" }, "Warnings"),
+        d.warns.length
+          ? h("ul", { class: "list" }, d.warns.map((w) =>
+              h("li", null,
+                h("div", { class: "grow" }, h("div", null, w.name), h("div", { class: "muted small" }, w.last || "No reason")),
+                h("span", { class: "chip" }, `${w.count} warn${w.count === 1 ? "" : "s"}`))))
+          : h("p", { class: "empty" }, "No warnings yet.")),
+      h("div", { class: "panel" },
+        h("h2", null, "Banned members"),
+        d.banned.length
+          ? h("ul", { class: "list" }, d.banned.map((b) =>
+              h("li", null,
+                h("div", { class: "grow" }, h("div", null, b.name), h("div", { class: "muted small" }, b.reason)),
+                h("button", { class: "btn ghost sm", type: "button", onclick: async () => {
+                  if (!confirm(`Unban ${b.name}?`)) return;
+                  if (await attempt(() => api(`/api/guilds/${id}/unban`, { method: "POST", body: { userId: b.id } }), "Unbanned")) refresh();
+                } }, "Unban"))))
+          : h("p", { class: "empty" }, "Nobody is banned."))),
+    h("div", { class: "panel", style: "margin-top:20px" },
+      h("h2", null, "Jailed members"),
+      jail.jailed.length
+        ? h("ul", { class: "list" }, jail.jailed.map((j) =>
             h("li", null,
-              h("div", { class: "grow" }, h("div", null, w.name), h("div", { class: "muted small" }, w.last || "No reason")),
-              h("span", { class: "chip" }, `${w.count} warn${w.count === 1 ? "" : "s"}`))))
-        : h("p", { class: "empty" }, "No warnings yet.")),
-    h("div", { class: "panel" },
-      h("h2", null, "Banned members"),
-      d.banned.length
-        ? h("ul", { class: "list" }, d.banned.map((b) =>
-            h("li", null,
-              h("div", { class: "grow" }, h("div", null, b.name), h("div", { class: "muted small" }, b.reason)),
+              h("div", { class: "grow" }, h("div", null, j.name)),
               h("button", { class: "btn ghost sm", type: "button", onclick: async () => {
-                if (!confirm(`Unban ${b.name}?`)) return;
-                if (await attempt(() => api(`/api/guilds/${id}/unban`, { method: "POST", body: { userId: b.id } }), "Unbanned")) refresh();
-              } }, "Unban"))))
-        : h("p", { class: "empty" }, "Nobody is banned.")))); 
+                if (!confirm(`Unjail ${j.name} and restore their old roles?`)) return;
+                if (await attempt(() => api(`/api/guilds/${id}/unjail`, { method: "POST", body: { userId: j.id } }), "Unjailed")) refresh();
+              } }, "Unjail"))))
+        : h("p", { class: "empty" }, "Nobody is jailed.")));
 }
 
 /* ---------- Send message (text + photos to a channel) ---------- */
