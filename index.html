@@ -674,6 +674,43 @@ function imageSlot({ hasExisting, onFile }) {
   return { box, fileInput, get value() { return value; } };
 }
 
+// Same "keep / remove / replace" upload pattern as imageSlot, worded for full backgrounds
+// (welcome image, leaderboard image, profile card) instead of small DM attachments.
+function backgroundSlot({ hasExisting, hint }) {
+  const fileInput = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true });
+  const box = h("div");
+  let value; // undefined = keep, null = remove, dataUrl = replace
+  let has = hasExisting;
+  const draw = () => {
+    let content;
+    if (typeof value === "string") {
+      content = h("div", { class: "toggle-row" }, h("span", null, "New background ready to upload"),
+        h("button", { class: "btn ghost sm", type: "button", onclick: () => { value = undefined; draw(); } }, "Remove"));
+    } else if (has && value !== null) {
+      content = h("div", { class: "toggle-row" }, h("span", null, "Using a custom background"),
+        h("button", { class: "btn danger sm", type: "button", onclick: () => { value = null; draw(); } }, "Remove background"));
+    } else {
+      content = h("div", { class: "drop", tabindex: "0", role: "button", onclick: () => fileInput.click(),
+        onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fileInput.click(); } } },
+        h("strong", null, "Click to upload a background"),
+        h("span", { class: "muted small" }, hint || "PNG, JPG, GIF or WEBP · maximum 5MB · falls back to a starfield if skipped"));
+    }
+    box.replaceChildren(content);
+  };
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files[0];
+    fileInput.value = "";
+    if (!f) return;
+    if (!/^image\/(png|jpe?g|gif|webp)$/.test(f.type)) return toast(errText("invalid_image"), true);
+    if (f.size > 5 * 1024 * 1024) return toast(errText("file_too_large"), true);
+    const fr = new FileReader();
+    fr.onload = () => { value = fr.result; draw(); };
+    fr.readAsDataURL(f);
+  });
+  draw();
+  return { box, fileInput, get value() { return value; } };
+}
+
 async function renderModeration(body, id, d, refresh) {
   let jail, modMsg;
   try { [jail, modMsg] = await Promise.all([api(`/api/guilds/${id}/jail`), api(`/api/guilds/${id}/mod-messages`)]); }
@@ -1016,9 +1053,39 @@ function openAutoReplyModal(id, embeds, existing, done) {
 }
 
 /* ---------- Welcome ---------- */
+// A small drag-to-position widget shared by the welcome-image layout editor below.
+// `pos` is mutated in place ({x,y} in real canvas pixels) as the element is dragged.
+function makeDraggable(container, el, pos, scale) {
+  el.style.position = "absolute";
+  el.style.touchAction = "none";
+  el.style.cursor = "grab";
+  const apply = () => { el.style.left = (pos.x * scale) + "px"; el.style.top = (pos.y * scale) + "px"; };
+  apply();
+  let dragging = false, startX = 0, startY = 0, origLeft = 0, origTop = 0;
+  el.addEventListener("pointerdown", (ev) => {
+    dragging = true;
+    el.setPointerCapture(ev.pointerId);
+    startX = ev.clientX; startY = ev.clientY;
+    origLeft = parseFloat(el.style.left) || 0; origTop = parseFloat(el.style.top) || 0;
+    el.style.cursor = "grabbing";
+  });
+  el.addEventListener("pointermove", (ev) => {
+    if (!dragging) return;
+    let nl = origLeft + (ev.clientX - startX), nt = origTop + (ev.clientY - startY);
+    nl = Math.max(0, Math.min(container.clientWidth - el.offsetWidth, nl));
+    nt = Math.max(0, Math.min(container.clientHeight - el.offsetHeight, nt));
+    el.style.left = nl + "px"; el.style.top = nt + "px";
+    pos.x = Math.round(nl / scale); pos.y = Math.round(nt / scale);
+  });
+  const stop = (ev) => { dragging = false; el.style.cursor = "grab"; try { el.releasePointerCapture(ev.pointerId); } catch {} };
+  el.addEventListener("pointerup", stop);
+  el.addEventListener("pointercancel", stop);
+  return { apply };
+}
+
 async function renderWelcome(body, id, d) {
-  let cfg;
-  try { cfg = await api(`/api/guilds/${id}/welcome`); }
+  let cfg, user;
+  try { [cfg, user] = await Promise.all([api(`/api/guilds/${id}/welcome`), api("/api/me")]); }
   catch (e) { return failView(e); }
 
   const enabled = h("input", { type: "checkbox", checked: cfg.enabled });
@@ -1026,46 +1093,62 @@ async function renderWelcome(body, id, d) {
   message.value = cfg.message || "";
   const chan = channelSelect(d.text, cfg.channel, "No welcome channel");
   const imageEnabled = h("input", { type: "checkbox", checked: cfg.imageEnabled });
-
-  let background; // undefined = keep, null = remove, dataUrl = replace
-  let hasBg = cfg.hasBackground;
-  const fileInput = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true });
-  const bgBox = h("div");
-  const drawBg = () => {
-    let content;
-    if (typeof background === "string") {
-      content = h("div", { class: "toggle-row" }, h("span", null, "New background ready to upload"),
-        h("button", { class: "btn ghost sm", type: "button", onclick: () => { background = undefined; drawBg(); } }, "Remove"));
-    } else if (hasBg && background !== null) {
-      content = h("div", { class: "toggle-row" }, h("span", null, "Using a custom background"),
-        h("button", { class: "btn danger sm", type: "button", onclick: () => { background = null; drawBg(); } }, "Remove background"));
-    } else {
-      content = h("div", { class: "drop", tabindex: "0", role: "button", onclick: () => fileInput.click(),
-        onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fileInput.click(); } } },
-        h("strong", null, "Click to upload a background"),
-        h("span", { class: "muted small" }, "PNG, JPG, GIF or WEBP · maximum 5MB · falls back to a starfield if skipped"));
-    }
-    bgBox.replaceChildren(content);
-  };
-  fileInput.addEventListener("change", () => {
-    const f = fileInput.files[0];
-    fileInput.value = "";
-    if (!f) return;
-    if (!/^image\/(png|jpe?g|gif|webp)$/.test(f.type)) return toast(errText("invalid_image"), true);
-    if (f.size > 5 * 1024 * 1024) return toast(errText("file_too_large"), true);
-    const fr = new FileReader();
-    fr.onload = () => { background = fr.result; drawBg(); };
-    fr.readAsDataURL(f);
-  });
-  drawBg();
+  const bg = backgroundSlot({ hasExisting: cfg.hasBackground });
 
   const save = h("button", { class: "btn", type: "button" }, "Save welcome settings");
   save.onclick = async () => {
     save.disabled = true;
     const payload = { enabled: enabled.checked, message: message.value, channel: chan.value, imageEnabled: imageEnabled.checked };
-    if (background !== undefined) payload.background = background;
+    if (bg.value !== undefined) payload.background = bg.value;
     await attempt(() => api(`/api/guilds/${id}/welcome`, { method: "POST", body: payload }), "Welcome settings saved");
     save.disabled = false;
+  };
+
+  // ---- Drag-and-drop layout editor: a scaled-down live preview of the 960×320 image ----
+  const SCALE = 0.5;
+  const canvasW = (cfg.canvas?.w || 960) * SCALE, canvasH = (cfg.canvas?.h || 320) * SCALE;
+  const avatarPx = (cfg.canvas?.avatarSize || 180) * SCALE;
+  const avatarPos = { ...(cfg.avatarPos || { x: 60, y: 70 }) };
+  const namePos = { ...(cfg.namePos || { x: 280, y: 100 }) };
+  const subPos = { ...(cfg.subPos || { x: 280, y: 180 }) };
+  const DEFAULTS = { avatarPos: { x: 60, y: 70 }, namePos: { x: 280, y: 100 }, subPos: { x: 280, y: 180 } };
+
+  const previewBox = h("div", {
+    style: `position:relative;width:${canvasW}px;height:${canvasH}px;max-width:100%;border-radius:10px;overflow:hidden;` +
+      `background:${cfg.backgroundDataUrl ? `url(${cfg.backgroundDataUrl}) center/cover` : "#0b0b0d"};border:1px solid rgba(255,255,255,.15)`,
+  });
+  const avatarUrl = user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null;
+  const avatarEl = h("div", {
+    title: "Drag to reposition the avatar",
+    style: `width:${avatarPx}px;height:${avatarPx}px;border-radius:50%;box-sizing:border-box;border:2px solid #fff;` +
+      `background:${avatarUrl ? `url(${avatarUrl}) center/cover` : "#333"}`,
+  });
+  const nameEl = h("div", {
+    title: "Drag to reposition the username",
+    style: "font-weight:700;color:#fff;font-size:13px;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
+  }, user.username || "Username");
+  const subEl = h("div", {
+    title: "Drag to reposition the subtitle",
+    style: "font-weight:500;color:#fff;font-size:10px;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
+  }, `welcome to ${d.name}`);
+  previewBox.append(avatarEl, nameEl, subEl);
+
+  const avatarDrag = makeDraggable(previewBox, avatarEl, avatarPos, SCALE);
+  const nameDrag = makeDraggable(previewBox, nameEl, namePos, SCALE);
+  const subDrag = makeDraggable(previewBox, subEl, subPos, SCALE);
+
+  const saveLayout = h("button", { class: "btn sm", type: "button" }, "Save layout");
+  saveLayout.onclick = async () => {
+    saveLayout.disabled = true;
+    await attempt(() => api(`/api/guilds/${id}/welcome`, { method: "POST", body: { avatarPos, namePos, subPos } }), "Layout saved");
+    saveLayout.disabled = false;
+  };
+  const resetLayout = h("button", { class: "btn ghost sm", type: "button" }, "Reset to default layout");
+  resetLayout.onclick = () => {
+    Object.assign(avatarPos, DEFAULTS.avatarPos);
+    Object.assign(namePos, DEFAULTS.namePos);
+    Object.assign(subPos, DEFAULTS.subPos);
+    avatarDrag.apply(); nameDrag.apply(); subDrag.apply();
   };
 
   body.append(
@@ -1075,18 +1158,24 @@ async function renderWelcome(body, id, d) {
       h("div", { class: "toggle-row" },
         h("div", null, h("div", { style: "font-weight:600" }, "Enabled"), h("div", { class: "muted small" }, "Turn welcome messages on or off")),
         h("label", { class: "switch" }, enabled, h("i"))),
+      !enabled.checked && h("p", { class: "muted small" }, "⚠ Off — nothing will post when someone joins until this is on and a channel is picked below."),
       h("label", { class: "field" }, h("span", null, "Message"), message),
       h("label", { class: "field" }, h("span", null, "Channel"), chan)),
     h("div", { class: "panel", style: "max-width:720px" },
       h("div", { class: "row between" },
         h("h2", null, "Welcome image"),
         !cfg.imageAvailable && h("span", { class: "chip" }, "Needs jimp installed")),
-      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Attaches a generated banner (your background + their avatar + username) to the welcome message."),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Attaches a generated banner (your background + their avatar + username) to the welcome message. If this stays off nothing but the text message sends — also make sure your bot's Server Members intent is turned on, or it won't see people joining at all."),
       h("div", { class: "toggle-row" },
         h("div", null, h("div", { style: "font-weight:600" }, "Attach an image"), h("div", { class: "muted small" }, "Off = text welcome only")),
         h("label", { class: "switch" }, imageEnabled, h("i"))),
-      h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Background"), bgBox, fileInput),
-      save));
+      h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Background"), bg.box, bg.fileInput),
+      save),
+    h("div", { class: "panel", style: "max-width:720px" },
+      h("h2", null, "Welcome image layout"),
+      h("p", { class: "muted small", style: "margin-bottom:14px" }, "Drag the avatar, the name, and the subtitle to wherever you want them. This preview is half-size — the real position gets saved automatically."),
+      previewBox,
+      h("div", { class: "row", style: "margin-top:14px" }, saveLayout, resetLayout)));
 }
 
 /* ---------- Leveling ---------- */
@@ -1177,6 +1266,19 @@ async function renderLeveling(body, id, d) {
       h("label", { class: "switch" }, cb, h("i")));
   }
 
+  // Custom backgrounds for the generated /leaderboard and /profile images.
+  const leaderboardBg = backgroundSlot({ hasExisting: cfg.hasLeaderboardBackground });
+  const profileBg = backgroundSlot({ hasExisting: cfg.hasProfileBackground });
+  const saveImages = h("button", { class: "btn", type: "button" }, "Save images");
+  saveImages.onclick = async () => {
+    saveImages.disabled = true;
+    const payload = {};
+    if (leaderboardBg.value !== undefined) payload.leaderboardBackground = leaderboardBg.value;
+    if (profileBg.value !== undefined) payload.profileBackground = profileBg.value;
+    await attempt(() => api(`/api/guilds/${id}/leveling`, { method: "POST", body: payload }), "Images saved");
+    saveImages.disabled = false;
+  };
+
   body.append(
     h("div", { class: "panel" },
       h("h2", null, "Leveling"),
@@ -1203,7 +1305,19 @@ async function renderLeveling(body, id, d) {
       commandToggleRow("top", "/top", "Shows the server's XP leaderboard", cfg.commands?.top !== false),
       commandToggleRow("rank", "/rank", "Shows your (or someone else's) level and XP", cfg.commands?.rank !== false),
       commandToggleRow("reset", "/reset", "Resets a member's XP to 0 · requires Manage Roles", cfg.commands?.reset !== false),
-      commandToggleRow("setxp", "/setxp", "Sets a member's XP to a specific amount · requires Manage Roles", cfg.commands?.setxp !== false)),
+      commandToggleRow("setxp", "/setxp", "Sets a member's XP to a specific amount · requires Manage Roles", cfg.commands?.setxp !== false),
+      commandToggleRow("leaderboard", "/leaderboard", "Posts the leaderboard as a generated image", cfg.commands?.leaderboard !== false),
+      commandToggleRow("profile", "/profile", "Posts a generated profile card — level, rank, XP, voice hours, messages sent", cfg.commands?.profile !== false)),
+    h("div", { class: "panel" },
+      h("div", { class: "row between" },
+        h("h2", null, "Leaderboard & profile images"),
+        !cfg.imageAvailable && h("span", { class: "chip" }, "Needs jimp installed")),
+      h("p", { class: "muted small", style: "margin-bottom:16px" },
+        "Backgrounds for the /leaderboard and /profile images. Avatars are fetched fresh from Discord every time a card is generated — nothing about a member is ever saved to disk, the finished image is built, sent, and forgotten (it just lives on in Discord like any other attachment)."),
+      h("div", { class: "grid-2" },
+        h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Leaderboard background"), leaderboardBg.box, leaderboardBg.fileInput),
+        h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Profile card background"), profileBg.box, profileBg.fileInput)),
+      saveImages),
     h("div", { class: "panel" },
       h("h2", null, "Level rewards"),
       h("p", { class: "muted small", style: "margin-bottom:16px" }, "Give a role automatically when a member reaches a level."),
