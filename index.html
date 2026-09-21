@@ -1105,7 +1105,7 @@ async function renderWelcome(body, id, d) {
   };
 
   // ---- Drag-and-drop layout editor: a scaled-down live preview of the 960×320 image ----
-  const SCALE = 0.5;
+  const SCALE = 0.85;
   const canvasW = (cfg.canvas?.w || 960) * SCALE, canvasH = (cfg.canvas?.h || 320) * SCALE;
   const avatarPx = (cfg.canvas?.avatarSize || 180) * SCALE;
   const avatarPos = { ...(cfg.avatarPos || { x: 60, y: 70 }) };
@@ -1114,7 +1114,7 @@ async function renderWelcome(body, id, d) {
   const DEFAULTS = { avatarPos: { x: 60, y: 70 }, namePos: { x: 280, y: 100 }, subPos: { x: 280, y: 180 } };
 
   const previewBox = h("div", {
-    style: `position:relative;width:${canvasW}px;height:${canvasH}px;max-width:100%;border-radius:10px;overflow:hidden;` +
+    style: `position:relative;width:${canvasW}px;height:${canvasH}px;max-width:100%;flex-shrink:0;border-radius:10px;overflow:hidden;` +
       `background:${cfg.backgroundDataUrl ? `url(${cfg.backgroundDataUrl}) center/cover` : "#0b0b0d"};border:1px solid rgba(255,255,255,.15)`,
   });
   const avatarUrl = user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null;
@@ -1125,22 +1125,33 @@ async function renderWelcome(body, id, d) {
   });
   const nameEl = h("div", {
     title: "Drag to reposition the username",
-    style: "font-weight:700;color:#fff;font-size:13px;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
-  }, user.username || "Username");
+    style: "font-weight:700;color:#fff;font-size:16px;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
+  });
   const subEl = h("div", {
     title: "Drag to reposition the subtitle",
-    style: "font-weight:500;color:#fff;font-size:10px;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
-  }, `welcome to ${d.name}`);
+    style: "font-weight:500;color:#fff;font-size:12px;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
+  });
   previewBox.append(avatarEl, nameEl, subEl);
 
   const avatarDrag = makeDraggable(previewBox, avatarEl, avatarPos, SCALE);
   const nameDrag = makeDraggable(previewBox, nameEl, namePos, SCALE);
   const subDrag = makeDraggable(previewBox, subEl, subPos, SCALE);
 
+  // ---- Customizable text — {user} and {server} get swapped in for real values when the image is generated ----
+  const nameTemplate = h("input", { type: "text", maxlength: "100", placeholder: "{user}" });
+  nameTemplate.value = cfg.nameTemplate || "{user}";
+  const subTemplate = h("input", { type: "text", maxlength: "100", placeholder: "welcome to {server}" });
+  subTemplate.value = cfg.subTemplate || "welcome to {server}";
+  const previewText = (tpl) => (tpl || "").replaceAll("{user}", user.username || "Username").replaceAll("{server}", d.name);
+  const updatePreviewText = () => { nameEl.textContent = previewText(nameTemplate.value); subEl.textContent = previewText(subTemplate.value); };
+  nameTemplate.oninput = updatePreviewText;
+  subTemplate.oninput = updatePreviewText;
+  updatePreviewText();
+
   const saveLayout = h("button", { class: "btn sm", type: "button" }, "Save layout");
   saveLayout.onclick = async () => {
     saveLayout.disabled = true;
-    await attempt(() => api(`/api/guilds/${id}/welcome`, { method: "POST", body: { avatarPos, namePos, subPos } }), "Layout saved");
+    await attempt(() => api(`/api/guilds/${id}/welcome`, { method: "POST", body: { avatarPos, namePos, subPos, nameTemplate: nameTemplate.value, subTemplate: subTemplate.value } }), "Layout saved");
     saveLayout.disabled = false;
   };
   const resetLayout = h("button", { class: "btn ghost sm", type: "button" }, "Reset to default layout");
@@ -1148,7 +1159,8 @@ async function renderWelcome(body, id, d) {
     Object.assign(avatarPos, DEFAULTS.avatarPos);
     Object.assign(namePos, DEFAULTS.namePos);
     Object.assign(subPos, DEFAULTS.subPos);
-    avatarDrag.apply(); nameDrag.apply(); subDrag.apply();
+    nameTemplate.value = "{user}"; subTemplate.value = "welcome to {server}";
+    avatarDrag.apply(); nameDrag.apply(); subDrag.apply(); updatePreviewText();
   };
 
   body.append(
@@ -1171,11 +1183,15 @@ async function renderWelcome(body, id, d) {
         h("label", { class: "switch" }, imageEnabled, h("i"))),
       h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Background"), bg.box, bg.fileInput),
       save),
-    h("div", { class: "panel", style: "max-width:720px" },
+    h("div", { class: "panel" },
       h("h2", null, "Welcome image layout"),
-      h("p", { class: "muted small", style: "margin-bottom:14px" }, "Drag the avatar, the name, and the subtitle to wherever you want them. This preview is half-size — the real position gets saved automatically."),
-      previewBox,
-      h("div", { class: "row", style: "margin-top:14px" }, saveLayout, resetLayout)));
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Drag the avatar, the name, and the subtitle to wherever you want them, and customize what the text says. Use {user} and {server} as placeholders."),
+      h("div", { style: "display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start" },
+        previewBox,
+        h("div", { style: "flex:1;min-width:260px" },
+          h("label", { class: "field" }, h("span", null, "Name text"), nameTemplate),
+          h("label", { class: "field" }, h("span", null, "Subtitle text"), subTemplate),
+          h("div", { class: "row" }, saveLayout, resetLayout)))));
 }
 
 /* ---------- Leveling ---------- */
