@@ -211,8 +211,10 @@
   /* Locked to Noto Sans (same as fonts/YanSans.ttf on the bot host) — no font picker, so the preview always matches the real /leaderboard image. */
   .lb-wrap, .lb-me-card { font-family: 'Noto Sans', sans-serif; }
   .lb-wrap { border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,.15); }
-  .lb-head { margin: 10px; padding: 12px 18px; border-radius: 16px; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 800; font-size: .95rem; letter-spacing: .03em; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
-  .lb-head img { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; }
+  /* Header's icon is a draggable absolutely-positioned div (JS-driven, see renderLeveling) and its
+     text is centered independently — this rule is just the box's own look, not a layout. */
+  .lb-head { border-radius: 16px; background: rgba(0,0,0,.45); font-weight: 800; font-size: .95rem; letter-spacing: .03em; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
+  .lb-head > div { touch-action: none; }
   .lb-rows { margin: 0 10px 10px; }
   .lb-row { background: rgba(0,0,0,.45); }
   .lb-rows { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -1342,9 +1344,29 @@ async function renderLeveling(body, id, d) {
   const lbNameColor = h("input", { type: "color", value: cfg.leaderboardNameColor || "#ffffff" });
   const lbXpColor = h("input", { type: "color", value: cfg.leaderboardXpColor || "#ffffff" });
 
-  const lbWrap = h("div", { class: "lb-wrap", style: `background:${cfg.leaderboardBackgroundDataUrl ? `url(${cfg.leaderboardBackgroundDataUrl}) center/cover` : "#0b0b0d"}` });
-  const lbIconUrl = guildIcon({ id, icon: d.icon });
-  const lbHead = h("div", { class: "lb-head" }, lbIconUrl && h("img", { src: lbIconUrl, alt: "" }), h("span", null, `${d.name} · Server Chat Leaderboard`));
+  // ---- Header row — icon + name/suffix text, each independently toggleable/editable. The icon is
+  // freely draggable (only the icon — the text always stays centered). Coordinates are raw backend
+  // canvas pixels (a 960-wide, 64-tall header box); LB_SCALE maps that to this fixed-size preview.
+  const LB_SCALE = 0.85, LB_HEAD_W = 960, LB_HEAD_H = 64;
+  const guildIconUrl = cfg.guildIconUrl || guildIcon({ id, icon: d.icon });
+  const guildDisplayName = cfg.guildName || d.name;
+
+  const headerIconEnabled = h("input", { type: "checkbox", checked: cfg.headerIconEnabled !== false });
+  const headerNameEnabled = h("input", { type: "checkbox", checked: cfg.headerNameEnabled !== false });
+  const headerSuffixEnabled = h("input", { type: "checkbox", checked: cfg.headerSuffixEnabled !== false });
+  const headerNameText = h("input", { type: "text", maxlength: "100", placeholder: "{server}" });
+  headerNameText.value = cfg.headerNameText ?? "{server}";
+  const headerSuffixText = h("input", { type: "text", maxlength: "100", placeholder: "Server Chat Leaderboard" });
+  headerSuffixText.value = cfg.headerSuffixText ?? "Server Chat Leaderboard";
+  const headerIconSize = h("input", { type: "text", inputmode: "numeric", value: cfg.headerIconSize || 34 });
+  const headerIconPos = { ...(cfg.headerIconPos || { x: 14, y: 15 }) };
+  const HEADER_DEFAULTS = { headerIconPos: { x: 14, y: 15 }, headerIconSize: 34 };
+
+  const lbWrap = h("div", { class: "lb-wrap", style: `width:${Math.round(1000 * LB_SCALE)}px;max-width:100%;background:${cfg.leaderboardBackgroundDataUrl ? `url(${cfg.leaderboardBackgroundDataUrl}) center/cover` : "#0b0b0d"}` });
+  const lbHeadIconEl = h("div", { title: "Drag to reposition the icon", style: `border-radius:50%;box-sizing:border-box;border:2px solid #fff;background-size:cover;background-position:center;background-color:#333;${guildIconUrl ? `background-image:url(${guildIconUrl})` : ""}` });
+  const lbHeadTextEl = h("span", { style: "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;pointer-events:none" });
+  const lbHead = h("div", { class: "lb-head", style: `position:relative;width:${Math.round(LB_HEAD_W * LB_SCALE)}px;max-width:100%;height:${Math.round(LB_HEAD_H * LB_SCALE)}px;margin:10px auto` }, lbHeadIconEl, lbHeadTextEl);
+  const lbHeadDrag = makeDraggable(lbHead, lbHeadIconEl, headerIconPos, LB_SCALE);
   const lbRowsBox = h("div", { class: "lb-rows" });
   lbWrap.append(lbHead, lbRowsBox);
 
@@ -1354,10 +1376,27 @@ async function renderLeveling(body, id, d) {
   const applyLbStyle = () => {
     lbWrap.querySelectorAll(".lb-name").forEach((el) => { el.style.color = lbNameColor.value; });
     lbWrap.querySelectorAll(".lb-xp").forEach((el) => { el.style.color = lbXpColor.value; });
-    lbHead.style.color = lbNameColor.value;
+    lbHeadTextEl.style.color = lbNameColor.value;
     lbMeCard.querySelectorAll(".lb-name").forEach((el) => { el.style.color = lbNameColor.value; });
     lbMeCard.querySelectorAll(".lb-xp").forEach((el) => { el.style.color = lbXpColor.value; });
   };
+
+  const updateHeaderPreview = () => {
+    const size = Math.max(16, Math.min(80, Number(headerIconSize.value) || 34));
+    lbHeadIconEl.style.display = headerIconEnabled.checked ? "" : "none";
+    lbHeadIconEl.style.width = lbHeadIconEl.style.height = `${size * LB_SCALE}px`;
+    lbHeadDrag.apply();
+    const fill = (tpl) => (tpl || "").replaceAll("{server}", guildDisplayName);
+    const parts = [];
+    if (headerNameEnabled.checked) { const t = fill(headerNameText.value).trim(); if (t) parts.push(t); }
+    if (headerSuffixEnabled.checked) { const t = fill(headerSuffixText.value).trim(); if (t) parts.push(t); }
+    lbHeadTextEl.textContent = parts.join(" · ");
+    applyLbStyle();
+  };
+  [headerIconEnabled, headerNameEnabled, headerSuffixEnabled, headerNameText, headerSuffixText, headerIconSize].forEach((el) => {
+    el.addEventListener("input", updateHeaderPreview);
+  });
+  updateHeaderPreview();
 
   const drawLbRows = () => {
     lbRowsBox.replaceChildren(...board.slice(0, 50).map((row, i) =>
@@ -1395,10 +1434,22 @@ async function renderLeveling(body, id, d) {
   const saveLb = h("button", { class: "btn", type: "button" }, "Save leaderboard style");
   saveLb.onclick = async () => {
     saveLb.disabled = true;
-    const payload = { leaderboardNameColor: lbNameColor.value, leaderboardXpColor: lbXpColor.value };
+    const payload = {
+      leaderboardNameColor: lbNameColor.value, leaderboardXpColor: lbXpColor.value,
+      headerIconEnabled: headerIconEnabled.checked, headerNameEnabled: headerNameEnabled.checked, headerSuffixEnabled: headerSuffixEnabled.checked,
+      headerNameText: headerNameText.value, headerSuffixText: headerSuffixText.value,
+      headerIconSize: headerIconSize.value, headerIconPos,
+    };
     if (lbBg.value !== undefined) payload.leaderboardBackground = lbBg.value;
     await attempt(() => api(`/api/guilds/${id}/leveling`, { method: "POST", body: payload }), "Leaderboard style saved");
     saveLb.disabled = false;
+  };
+  const resetLbHeader = h("button", { class: "btn ghost sm", type: "button" }, "Reset icon position");
+  resetLbHeader.onclick = () => {
+    Object.assign(headerIconPos, HEADER_DEFAULTS.headerIconPos);
+    headerIconSize.value = HEADER_DEFAULTS.headerIconSize;
+    lbHeadDrag.apply();
+    updateHeaderPreview();
   };
 
   // Leveling Commands — matches the toggle-per-command layout from the reference dashboard.
@@ -1468,11 +1519,29 @@ async function renderLeveling(body, id, d) {
         h("h2", null, "Server Leaderboard"),
         !cfg.canvasEngineAvailable && h("span", { class: "chip" }, "Colors need the canvas engine")),
       h("p", { class: "muted small", style: "margin-bottom:16px" },
-        "A live styled preview of the /leaderboard image — rank, avatar, name, level, and XP. Customize the colors and background; hover a row to see the pop effect. Your own profile stays pinned beside the list."),
+        "A live styled preview of the /leaderboard image — rank, avatar, name, level, and XP. Drag the icon in the header to reposition it; everything else about the header can be toggled and edited below. Hover a row to see the pop effect. Your own profile stays pinned beside the list."),
       h("div", { style: "display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start" },
         h("div", { style: "flex-shrink:0;width:180px;position:sticky;top:16px" }, lbMeCard),
-        h("div", { style: "flex:1;min-width:280px" }, lbWrap)),
-      h("div", { style: "display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;margin-top:20px" },
+        h("div", { style: "flex-shrink:0" }, lbWrap)),
+      h("h3", { style: "margin-top:26px" }, "Header"),
+      h("p", { class: "muted small", style: "margin-bottom:14px" }, "Turn the icon, server name, and trailing text on or off, and edit either piece of text. {server} in the name field is swapped for your server's real name."),
+      h("div", { class: "grid-2", style: "margin-bottom:14px" },
+        h("div", { class: "toggle-row" },
+          h("div", null, h("div", { style: "font-weight:600" }, "Show icon")),
+          h("label", { class: "switch" }, headerIconEnabled, h("i"))),
+        h("label", { class: "field" }, h("span", null, "Icon size (px)"), headerIconSize)),
+      h("div", { class: "grid-2", style: "margin-bottom:14px" },
+        h("div", { class: "toggle-row" },
+          h("div", null, h("div", { style: "font-weight:600" }, "Show name")),
+          h("label", { class: "switch" }, headerNameEnabled, h("i"))),
+        h("label", { class: "field" }, h("span", null, "Name text"), headerNameText)),
+      h("div", { class: "grid-2", style: "margin-bottom:14px" },
+        h("div", { class: "toggle-row" },
+          h("div", null, h("div", { style: "font-weight:600" }, "Show trailing text")),
+          h("label", { class: "switch" }, headerSuffixEnabled, h("i"))),
+        h("label", { class: "field" }, h("span", null, "Trailing text"), headerSuffixText)),
+      h("div", { class: "row", style: "margin-bottom:20px" }, resetLbHeader),
+      h("div", { style: "display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start" },
         h("div", { style: "flex:1;min-width:260px" },
           h("div", { class: "grid-2" },
             h("label", { class: "field" }, h("span", null, "Name color"), lbNameColor),
