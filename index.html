@@ -205,6 +205,28 @@
     .user span.name { display: none; }
     main { padding: 20px 16px 48px; }
   }
+
+  /* ---------- styled server leaderboard preview ---------- */
+  .lb-wrap { border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,.15); }
+  .lb-head { padding: 16px 18px; font-weight: 800; letter-spacing: .03em; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
+  .lb-rows { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .lb-row {
+    display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 10px;
+    background: rgba(0,0,0,.35); transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .lb-row:hover { transform: scale(1.035); box-shadow: 0 6px 22px rgba(0,0,0,.45); background: rgba(0,0,0,.55); z-index: 2; position: relative; }
+  .lb-rank { width: 26px; flex-shrink: 0; text-align: center; font-weight: 800; opacity: .85; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
+  .lb-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,.5); }
+  .lb-name-wrap { flex: 1; min-width: 0; }
+  .lb-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
+  .lb-level { font-size: .78rem; opacity: .75; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
+  .lb-xp { flex-shrink: 0; font-weight: 800; text-align: right; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
+  .lb-me-card {
+    border-radius: 14px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.15); text-align: center;
+  }
+  .lb-me-card .lb-avatar { width: 64px; height: 64px; }
+  .lb-me-card .lb-name { font-size: 1.05rem; white-space: normal; }
 </style>
 </head>
 <body>
@@ -676,7 +698,7 @@ function imageSlot({ hasExisting, onFile }) {
 
 // Same "keep / remove / replace" upload pattern as imageSlot, worded for full backgrounds
 // (welcome image, leaderboard image, profile card) instead of small DM attachments.
-function backgroundSlot({ hasExisting, hint }) {
+function backgroundSlot({ hasExisting, hint, onPreview, existingDataUrl }) {
   const fileInput = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true });
   const box = h("div");
   let value; // undefined = keep, null = remove, dataUrl = replace
@@ -685,10 +707,10 @@ function backgroundSlot({ hasExisting, hint }) {
     let content;
     if (typeof value === "string") {
       content = h("div", { class: "toggle-row" }, h("span", null, "New background ready to upload"),
-        h("button", { class: "btn ghost sm", type: "button", onclick: () => { value = undefined; draw(); } }, "Remove"));
+        h("button", { class: "btn ghost sm", type: "button", onclick: () => { value = undefined; draw(); onPreview?.(existingDataUrl ?? null); } }, "Remove"));
     } else if (has && value !== null) {
       content = h("div", { class: "toggle-row" }, h("span", null, "Using a custom background"),
-        h("button", { class: "btn danger sm", type: "button", onclick: () => { value = null; draw(); } }, "Remove background"));
+        h("button", { class: "btn danger sm", type: "button", onclick: () => { value = null; draw(); onPreview?.(null); } }, "Remove background"));
     } else {
       content = h("div", { class: "drop", tabindex: "0", role: "button", onclick: () => fileInput.click(),
         onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fileInput.click(); } } },
@@ -704,7 +726,7 @@ function backgroundSlot({ hasExisting, hint }) {
     if (!/^image\/(png|jpe?g|gif|webp)$/.test(f.type)) return toast(errText("invalid_image"), true);
     if (f.size > 5 * 1024 * 1024) return toast(errText("file_too_large"), true);
     const fr = new FileReader();
-    fr.onload = () => { value = fr.result; draw(); };
+    fr.onload = () => { value = fr.result; draw(); onPreview?.(fr.result); };
     fr.readAsDataURL(f);
   });
   draw();
@@ -1290,7 +1312,7 @@ async function renderLeveling(body, id, d) {
           } }, "Delete"))))
     : h("p", { class: "empty" }, "No level rewards yet.");
 
-  // Leaderboard
+  // Manage XP — plain admin list (set/reset individual members)
   const boardList = board.length
     ? h("ul", { class: "list" }, board.map((row, i) =>
         h("li", null,
@@ -1309,6 +1331,76 @@ async function renderLeveling(body, id, d) {
             } }, "Reset")))))
     : h("p", { class: "empty" }, "Nobody has earned XP yet.");
 
+  // ---- Styled Server Leaderboard preview — matches the reference screenshot: rank, avatar, name, level, right-aligned XP. ----
+  const LB_CSS_FAMILY = { "serif-bold": "serif", "sans-serif": "sans-serif", serif: "serif", monospace: "monospace", cursive: "cursive", fantasy: "fantasy" };
+  const LB_CSS_BOLD = { "serif-bold": "700" };
+  const lbFontChoices = cfg.fontChoices?.length ? cfg.fontChoices : [{ id: "serif-bold", label: "Bold Serif" }, { id: "sans-serif", label: "Sans Serif" }];
+  const lbFont = h("select", null, lbFontChoices.map((f) => h("option", { value: f.id }, f.label)));
+  lbFont.value = cfg.leaderboardFont || lbFontChoices[0].id;
+  const lbNameColor = h("input", { type: "color", value: cfg.leaderboardNameColor || "#ffffff" });
+  const lbXpColor = h("input", { type: "color", value: cfg.leaderboardXpColor || "#ffffff" });
+
+  const lbWrap = h("div", { class: "lb-wrap", style: `background:${cfg.leaderboardBackgroundDataUrl ? `url(${cfg.leaderboardBackgroundDataUrl}) center/cover` : "#0b0b0d"}` });
+  const lbHead = h("div", { class: "lb-head" }, `${d.name} · Server Chat Leaderboard`);
+  const lbRowsBox = h("div", { class: "lb-rows" });
+  lbWrap.append(lbHead, lbRowsBox);
+
+  const lbMeCard = h("div", { class: "lb-me-card" });
+
+  const avatarBg = (url) => (url ? `background-image:url(${url})` : "background:#333");
+  const applyLbStyle = () => {
+    const fam = LB_CSS_FAMILY[lbFont.value] || "sans-serif";
+    const bold = LB_CSS_BOLD[lbFont.value] || "700";
+    lbWrap.querySelectorAll(".lb-name").forEach((el) => { el.style.fontFamily = fam; el.style.fontWeight = bold; el.style.color = lbNameColor.value; });
+    lbWrap.querySelectorAll(".lb-xp").forEach((el) => { el.style.fontFamily = fam; el.style.color = lbXpColor.value; });
+    lbHead.style.fontFamily = fam;
+    lbHead.style.color = lbNameColor.value;
+    lbMeCard.querySelectorAll(".lb-name").forEach((el) => { el.style.fontFamily = fam; el.style.fontWeight = bold; el.style.color = lbNameColor.value; });
+    lbMeCard.querySelectorAll(".lb-xp, .lb-level").forEach((el) => { el.style.fontFamily = fam; });
+  };
+
+  const drawLbRows = () => {
+    lbRowsBox.replaceChildren(...board.slice(0, 50).map((row, i) =>
+      h("div", { class: "lb-row" },
+        h("div", { class: "lb-rank" }, `#${i + 1}`),
+        h("div", { class: "lb-avatar", style: avatarBg(row.avatarUrl) }),
+        h("div", { class: "lb-name-wrap" },
+          h("div", { class: "lb-name" }, row.name),
+          h("div", { class: "lb-level" }, `Level ${row.level}`)),
+        h("div", { class: "lb-xp" }, `${row.xp} XP`))));
+    applyLbStyle();
+  };
+  drawLbRows();
+
+  if (cfg.me) {
+    lbMeCard.append(
+      h("div", { class: "lb-avatar", style: `${avatarBg(cfg.me.avatarUrl)};width:64px;height:64px` }),
+      h("div", { class: "lb-name" }, cfg.me.name),
+      h("div", { class: "lb-level" }, `Rank #${cfg.me.rank} · Level ${cfg.me.level}`),
+      h("div", { class: "lb-xp" }, `${cfg.me.xp} XP`),
+      h("div", { class: "muted small" }, `${cfg.me.messages} messages`));
+  } else {
+    lbMeCard.append(h("div", { class: "muted small" }, "No stats yet — chat a bit first."));
+  }
+  applyLbStyle();
+
+  [lbFont, lbNameColor, lbXpColor].forEach((el) => el.addEventListener("input", applyLbStyle));
+
+  const lbBg = backgroundSlot({
+    hasExisting: cfg.hasLeaderboardBackground,
+    existingDataUrl: cfg.leaderboardBackgroundDataUrl,
+    onPreview: (dataUrl) => { lbWrap.style.background = dataUrl ? `url(${dataUrl}) center/cover` : "#0b0b0d"; },
+  });
+
+  const saveLb = h("button", { class: "btn", type: "button" }, "Save leaderboard style");
+  saveLb.onclick = async () => {
+    saveLb.disabled = true;
+    const payload = { leaderboardFont: lbFont.value, leaderboardNameColor: lbNameColor.value, leaderboardXpColor: lbXpColor.value };
+    if (lbBg.value !== undefined) payload.leaderboardBackground = lbBg.value;
+    await attempt(() => api(`/api/guilds/${id}/leveling`, { method: "POST", body: payload }), "Leaderboard style saved");
+    saveLb.disabled = false;
+  };
+
   // Leveling Commands — matches the toggle-per-command layout from the reference dashboard.
   function commandToggleRow(key, label, desc, checked) {
     const cb = h("input", { type: "checkbox", checked });
@@ -1323,16 +1415,14 @@ async function renderLeveling(body, id, d) {
       h("label", { class: "switch" }, cb, h("i")));
   }
 
-  // Custom backgrounds for the generated /leaderboard and /profile images.
-  const leaderboardBg = backgroundSlot({ hasExisting: cfg.hasLeaderboardBackground });
+  // Custom background for the generated /profile image (the /leaderboard background now lives in the styled leaderboard panel below).
   const profileBg = backgroundSlot({ hasExisting: cfg.hasProfileBackground });
-  const saveImages = h("button", { class: "btn", type: "button" }, "Save images");
+  const saveImages = h("button", { class: "btn", type: "button" }, "Save image");
   saveImages.onclick = async () => {
     saveImages.disabled = true;
     const payload = {};
-    if (leaderboardBg.value !== undefined) payload.leaderboardBackground = leaderboardBg.value;
     if (profileBg.value !== undefined) payload.profileBackground = profileBg.value;
-    await attempt(() => api(`/api/guilds/${id}/leveling`, { method: "POST", body: payload }), "Images saved");
+    await attempt(() => api(`/api/guilds/${id}/leveling`, { method: "POST", body: payload }), "Image saved");
     saveImages.disabled = false;
   };
 
@@ -1367,14 +1457,31 @@ async function renderLeveling(body, id, d) {
       commandToggleRow("profile", "/profile", "Posts a generated profile card — level, rank, XP, voice hours, messages sent", cfg.commands?.profile !== false)),
     h("div", { class: "panel" },
       h("div", { class: "row between" },
-        h("h2", null, "Leaderboard & profile images"),
+        h("h2", null, "Profile card image"),
         !cfg.imageAvailable && h("span", { class: "chip" }, "Needs jimp installed")),
       h("p", { class: "muted small", style: "margin-bottom:16px" },
-        "Backgrounds for the /leaderboard and /profile images. Avatars are fetched fresh from Discord every time a card is generated — nothing about a member is ever saved to disk, the finished image is built, sent, and forgotten (it just lives on in Discord like any other attachment)."),
-      h("div", { class: "grid-2" },
-        h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Leaderboard background"), leaderboardBg.box, leaderboardBg.fileInput),
-        h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Profile card background"), profileBg.box, profileBg.fileInput)),
+        "Background for the generated /profile image. Avatars are fetched fresh from Discord every time a card is generated — nothing about a member is ever saved to disk, the finished image is built, sent, and forgotten (it just lives on in Discord like any other attachment)."),
+      h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Profile card background"), profileBg.box, profileBg.fileInput),
       saveImages),
+    h("div", { class: "panel" },
+      h("div", { class: "row between" },
+        h("h2", null, "Server Leaderboard"),
+        !cfg.canvasEngineAvailable && h("span", { class: "chip" }, "Font/color need the canvas engine")),
+      h("p", { class: "muted small", style: "margin-bottom:16px" },
+        "A live styled preview of the /leaderboard image — rank, avatar, name, level, and XP. Customize the font, colors, and background; hover a row to see the pop effect. Your own profile stays pinned beside the list."),
+      h("div", { style: "display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start" },
+        h("div", { style: "flex-shrink:0;width:180px;position:sticky;top:16px" }, lbMeCard),
+        h("div", { style: "flex:1;min-width:280px" }, lbWrap)),
+      h("div", { style: "display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;margin-top:20px" },
+        h("div", { style: "flex:1;min-width:260px" },
+          h("label", { class: "field" }, h("span", null, "Font"), lbFont),
+          h("div", { class: "grid-2" },
+            h("label", { class: "field" }, h("span", null, "Name color"), lbNameColor),
+            h("label", { class: "field" }, h("span", null, "XP color"), lbXpColor)),
+          h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Background"), lbBg.box, lbBg.fileInput),
+          saveLb)),
+      h("h3", { style: "margin-top:26px" }, "Manage XP"),
+      boardList),
     h("div", { class: "panel" },
       h("h2", null, "Level rewards"),
       h("p", { class: "muted small", style: "margin-bottom:16px" }, "Give a role automatically when a member reaches a level."),
@@ -1389,10 +1496,7 @@ async function renderLeveling(body, id, d) {
         h("label", { class: "switch" }, rewardRemove, h("i"))),
       addReward,
       h("h3", { style: "margin-top:26px" }, "Current rewards"),
-      rewardsList),
-    h("div", { class: "panel" },
-      h("h2", null, "Leaderboard"),
-      boardList));
+      rewardsList));
 }
 
 /* ---------- Verification ---------- */
