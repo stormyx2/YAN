@@ -1125,11 +1125,11 @@ async function renderWelcome(body, id, d) {
   });
   const nameEl = h("div", {
     title: "Drag to reposition the username",
-    style: "font-weight:700;color:#fff;font-size:16px;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
+    style: "white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
   });
   const subEl = h("div", {
     title: "Drag to reposition the subtitle",
-    style: "font-weight:500;color:#fff;font-size:12px;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
+    style: "white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.85)",
   });
   previewBox.append(avatarEl, nameEl, subEl);
 
@@ -1142,16 +1142,47 @@ async function renderWelcome(body, id, d) {
   nameTemplate.value = cfg.nameTemplate || "{user}";
   const subTemplate = h("input", { type: "text", maxlength: "100", placeholder: "welcome to {server}" });
   subTemplate.value = cfg.subTemplate || "welcome to {server}";
-  const previewText = (tpl) => (tpl || "").replaceAll("{user}", user.username || "Username").replaceAll("{server}", d.name);
-  const updatePreviewText = () => { nameEl.textContent = previewText(nameTemplate.value); subEl.textContent = previewText(subTemplate.value); };
-  nameTemplate.oninput = updatePreviewText;
-  subTemplate.oninput = updatePreviewText;
+
+  // ---- Size, color, font — needs the canvas engine on the host to actually apply ----
+  const CSS_FAMILY = { "serif-bold": "serif", "sans-serif": "sans-serif", serif: "serif", monospace: "monospace", cursive: "cursive", fantasy: "fantasy" };
+  const CSS_BOLD = { "serif-bold": "700" };
+  const fontChoices = cfg.fontChoices?.length ? cfg.fontChoices : [{ id: "serif-bold", label: "Bold Serif" }, { id: "sans-serif", label: "Sans Serif" }];
+  const fontFamily = h("select", null, fontChoices.map((f) => h("option", { value: f.id }, f.label)));
+  fontFamily.value = cfg.fontFamily || fontChoices[0].id;
+  const nameColor = h("input", { type: "color", value: cfg.nameColor || "#ffffff" });
+  const subColor = h("input", { type: "color", value: cfg.subColor || "#ffffff" });
+  const nameSize = h("input", { type: "text", inputmode: "numeric", value: cfg.nameSize || 64 });
+  const subSize = h("input", { type: "text", inputmode: "numeric", value: cfg.subSize || 32 });
+
+  const updatePreviewText = () => {
+    const previewFill = (tpl) => (tpl || "").replaceAll("{user}", user.username || "Username").replaceAll("{server}", d.name);
+    nameEl.textContent = previewFill(nameTemplate.value);
+    subEl.textContent = previewFill(subTemplate.value);
+    const fam = CSS_FAMILY[fontFamily.value] || "sans-serif";
+    const bold = CSS_BOLD[fontFamily.value] || "600";
+    nameEl.style.fontFamily = fam;
+    nameEl.style.fontWeight = bold;
+    nameEl.style.color = nameColor.value;
+    nameEl.style.fontSize = `${(Number(nameSize.value) || 64) * SCALE}px`;
+    subEl.style.fontFamily = fam;
+    subEl.style.fontWeight = CSS_BOLD[fontFamily.value] ? bold : "500";
+    subEl.style.color = subColor.value;
+    subEl.style.fontSize = `${(Number(subSize.value) || 32) * SCALE}px`;
+  };
+  [nameTemplate, subTemplate, fontFamily, nameColor, subColor, nameSize, subSize].forEach((el) => {
+    el.addEventListener("input", updatePreviewText);
+  });
   updatePreviewText();
 
   const saveLayout = h("button", { class: "btn sm", type: "button" }, "Save layout");
   saveLayout.onclick = async () => {
     saveLayout.disabled = true;
-    await attempt(() => api(`/api/guilds/${id}/welcome`, { method: "POST", body: { avatarPos, namePos, subPos, nameTemplate: nameTemplate.value, subTemplate: subTemplate.value } }), "Layout saved");
+    await attempt(() => api(`/api/guilds/${id}/welcome`, { method: "POST", body: {
+      avatarPos, namePos, subPos,
+      nameTemplate: nameTemplate.value, subTemplate: subTemplate.value,
+      fontFamily: fontFamily.value, nameColor: nameColor.value, subColor: subColor.value,
+      nameSize: nameSize.value, subSize: subSize.value,
+    } }), "Layout saved");
     saveLayout.disabled = false;
   };
   const resetLayout = h("button", { class: "btn ghost sm", type: "button" }, "Reset to default layout");
@@ -1160,6 +1191,8 @@ async function renderWelcome(body, id, d) {
     Object.assign(namePos, DEFAULTS.namePos);
     Object.assign(subPos, DEFAULTS.subPos);
     nameTemplate.value = "{user}"; subTemplate.value = "welcome to {server}";
+    fontFamily.value = fontChoices[0].id; nameColor.value = "#ffffff"; subColor.value = "#ffffff";
+    nameSize.value = 64; subSize.value = 32;
     avatarDrag.apply(); nameDrag.apply(); subDrag.apply(); updatePreviewText();
   };
 
@@ -1185,12 +1218,20 @@ async function renderWelcome(body, id, d) {
       save),
     h("div", { class: "panel" },
       h("h2", null, "Welcome image layout"),
-      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Drag the avatar, the name, and the subtitle to wherever you want them, and customize what the text says. Use {user} and {server} as placeholders."),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Drag the avatar, the name, and the subtitle to wherever you want them, customize what the text says, and its size/color/font." +
+        (cfg.canvasEngineAvailable ? "" : " (Size/color/font need the canvas engine installed on the bot host — see web.js's setup notes.)") + " Use {user} and {server} as placeholders."),
       h("div", { style: "display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start" },
         previewBox,
         h("div", { style: "flex:1;min-width:260px" },
           h("label", { class: "field" }, h("span", null, "Name text"), nameTemplate),
           h("label", { class: "field" }, h("span", null, "Subtitle text"), subTemplate),
+          h("label", { class: "field" }, h("span", null, "Font"), fontFamily),
+          h("div", { class: "grid-2" },
+            h("label", { class: "field" }, h("span", null, "Name size (px)"), nameSize),
+            h("label", { class: "field" }, h("span", null, "Subtitle size (px)"), subSize)),
+          h("div", { class: "grid-2" },
+            h("label", { class: "field" }, h("span", null, "Name color"), nameColor),
+            h("label", { class: "field" }, h("span", null, "Subtitle color"), subColor)),
           h("div", { class: "row" }, saveLayout, resetLayout)))));
 }
 
