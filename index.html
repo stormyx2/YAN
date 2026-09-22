@@ -317,6 +317,8 @@ const ERRORS = {
   no_mappings: "Add at least one emoji → role mapping first.",
   invalid_emoji: "That emoji didn't look right. Paste a real emoji, or a custom emoji copied from Discord.",
   duplicate_emoji: "You used the same emoji twice — each emoji can only map to one role.",
+  invalid_color: "That's not a valid color. Pick one with the color picker.",
+  not_active: "Nothing is armed right now.",
 };
 const errText = (code) => ERRORS[code] || `Something went wrong (${code}).`;
 
@@ -600,7 +602,7 @@ function failView(e) {
 }
 
 /* ---------- Server page ---------- */
-const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"], ["selfroles", "Self Roles"], ["whitelist", "Whitelist"]];
+const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"], ["selfroles", "Self Roles"], ["destroy", "Self Destruct"], ["whitelist", "Whitelist"]];
 
 async function viewServer(id, tab = "overview") {
   shell(null, h("p", { class: "muted" }, "Loading server…"));
@@ -628,6 +630,7 @@ async function viewServer(id, tab = "overview") {
   else if (tab === "leveling") await renderLeveling(body, id, data);
   else if (tab === "verify") await renderVerification(body, id, data);
   else if (tab === "selfroles") await renderSelfRoles(body, id, data);
+  else if (tab === "destroy") await renderDestroyServer(body, id, data);
   else if (tab === "whitelist") await renderWhitelist(body, id, data);
 }
 
@@ -1796,6 +1799,99 @@ function selfRolePanel(id, d, kind, cfg, { heading, hint }) {
       h("p", { class: "muted small", style: "margin-bottom:8px" }, "Paste a normal emoji, or a custom server emoji (type \\:emojiname: in Discord and copy the result it shows)."),
       rowsBox, addRow),
     h("div", { class: "row" }, saveOnly, post));
+}
+
+/* ---------- Self Destruct ---------- */
+async function renderDestroyServer(body, id, d) {
+  let cfg;
+  try { cfg = await api(`/api/guilds/${id}/destroyserver`); }
+  catch (e) { return failView(e); }
+
+  // ---- stage list (each: rename ALL channels to `text`, wait `seconds`, move to the next) ----
+  const stages = (cfg.stages || []).map((s) => ({ text: s.text, seconds: s.seconds }));
+  const stagesBox = h("ul", { class: "list" });
+  const drawStages = () => {
+    const items = stages.map((stage, i) => {
+      const textInput = h("input", { type: "text", placeholder: "sky is starting", maxlength: "100" });
+      textInput.value = stage.text || "";
+      textInput.oninput = () => { stage.text = textInput.value; };
+      const secInput = h("input", { type: "number", min: "1", max: "604800", style: "width:90px;flex:none" });
+      secInput.value = stage.seconds ?? 10;
+      secInput.oninput = () => { stage.seconds = Number(secInput.value) || 1; };
+      return h("li", null,
+        h("span", { class: "muted small", style: "flex:none" }, `#${i + 1}`),
+        h("div", { class: "grow" }, textInput),
+        secInput, h("span", { class: "muted small", style: "flex:none" }, "sec"),
+        h("button", { class: "btn danger sm", type: "button", onclick: () => { stages.splice(i, 1); drawStages(); } }, "Remove"));
+    });
+    stagesBox.replaceChildren(...(items.length ? items : [h("li", null, h("span", { class: "muted small" }, "No channel-name changes yet — add one below."))]));
+  };
+  drawStages();
+  const addStage = h("button", { class: "btn ghost sm", type: "button", style: "margin-top:10px", onclick: () => { stages.push({ text: "", seconds: 10 }); drawStages(); } }, "+ Add a change");
+
+  const doneChangingText = h("textarea", { placeholder: "That's the last name change.", maxlength: "500" });
+  doneChangingText.value = cfg.doneChangingText || "";
+  const deleteDelaySeconds = h("input", { type: "number", min: "0", max: "604800" });
+  deleteDelaySeconds.value = cfg.deleteDelaySeconds ?? 30;
+  const startDeletingText = h("textarea", { placeholder: "Deleting everything now.", maxlength: "500" });
+  startDeletingText.value = cfg.startDeletingText || "";
+  const deleteAfter = h("input", { type: "checkbox", checked: cfg.deleteAfter });
+  const color = h("input", { type: "color" });
+  color.value = /^#[0-9a-fA-F]{6}$/.test(cfg.color) ? cfg.color : "#ff0000";
+  const role = roleSelect(d.roles || [], cfg.roleId, "Only owner / Administrators");
+  const gifSlot = imageSlot({ hasExisting: cfg.hasGif });
+
+  const buildPayload = () => ({
+    stages: stages.filter((s) => s.text && s.text.trim()),
+    doneChangingText: doneChangingText.value,
+    deleteDelaySeconds: deleteDelaySeconds.value,
+    startDeletingText: startDeletingText.value,
+    deleteAfter: deleteAfter.checked,
+    color: color.value,
+    roleId: role.value,
+    gif: gifSlot.value,
+  });
+
+  const save = h("button", { class: "btn ghost", type: "button" }, "Save settings");
+  save.onclick = async () => {
+    save.disabled = true;
+    await attempt(() => api(`/api/guilds/${id}/destroyserver`, { method: "POST", body: buildPayload() }), "Saved");
+    save.disabled = false;
+  };
+
+  const defuse = h("button", { class: "btn danger", type: "button" }, "Force defuse now");
+  defuse.onclick = async () => {
+    defuse.disabled = true;
+    if (await attempt(() => api(`/api/guilds/${id}/destroyserver/stop`, { method: "POST", body: {} }), "Defused")) return viewServer(id, "destroy");
+    defuse.disabled = false;
+  };
+
+  const status = cfg.active ? h("span", { class: "chip" }, "Running right now") : h("span", { class: "chip" }, "Not running");
+
+  body.append(
+    h("div", { class: "panel", style: "max-width:720px;margin-bottom:20px" },
+      h("div", { class: "row between" }, h("h2", null, "Self Destruct"), status),
+      h("p", { class: "muted small", style: "margin-bottom:16px" },
+        "Set this up here, then just type /starttimebomb in Discord (no arguments needed) to run it. It cycles through the channel-name changes below in order, renaming every channel and waiting each one's own timer, then posts your “done changing” message, waits, posts your “start deleting” message, and deletes every channel (if that's turned on). /stoptimebomb cancels it mid-way. Only the role you pick below (plus the server owner and Administrators) can use either command."),
+      h("div", { class: "field" },
+        h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Channel name changes, in order"),
+        h("p", { class: "muted small", style: "margin-bottom:8px" }, "Every channel gets renamed to this text, then it waits the number of seconds you set before moving to the next one. Example: “sky is starting” for 10 sec, then “sky is king” for 10 sec."),
+        stagesBox, addStage),
+      h("label", { class: "field" }, h("span", null, "“Done changing” message"), doneChangingText),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Sent right after the last name change finishes."),
+      h("label", { class: "field" }, h("span", null, "Wait this many seconds before deleting"), deleteDelaySeconds),
+      h("label", { class: "field" }, h("span", null, "“Start deleting” message"), startDeletingText),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Sent right before channels actually start getting deleted."),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Delete all channels at the end"), h("div", { class: "muted small" }, "Off = the sequence just stops after the “start deleting” message")),
+        h("label", { class: "switch" }, deleteAfter, h("i"))),
+      h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "GIF / image for the messages"), gifSlot.box, gifSlot.fileInput),
+      h("label", { class: "field" }, h("span", null, "Message color"), color),
+      h("label", { class: "field" }, h("span", null, "Only this role can use /starttimebomb and /stoptimebomb"), role),
+      h("div", { class: "row" }, save, cfg.active ? defuse : null)),
+    h("div", { class: "panel", style: "max-width:720px" },
+      h("p", { class: "muted small" },
+        "By turning this on, you agree it's for quickly tearing down a server of yours you no longer need — not for use against a server you don't own or run, like raiding.")));
 }
 
 /* ---------- Whitelist ---------- */
