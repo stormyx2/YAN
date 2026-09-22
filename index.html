@@ -314,6 +314,9 @@ const ERRORS = {
   purge_failed: "Couldn't delete those messages — they might be older than 14 days, which Discord won't let bots bulk-delete.",
   no_jail_role: "Pick and save a jail role first.",
   missing_manage_roles: "The bot needs the Manage Roles permission, and its own role must sit above the jail role and the member's other roles.",
+  no_mappings: "Add at least one emoji → role mapping first.",
+  invalid_emoji: "That emoji didn't look right. Paste a real emoji, or a custom emoji copied from Discord.",
+  duplicate_emoji: "You used the same emoji twice — each emoji can only map to one role.",
 };
 const errText = (code) => ERRORS[code] || `Something went wrong (${code}).`;
 
@@ -597,7 +600,7 @@ function failView(e) {
 }
 
 /* ---------- Server page ---------- */
-const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"], ["whitelist", "Whitelist"]];
+const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"], ["selfroles", "Self Roles"], ["whitelist", "Whitelist"]];
 
 async function viewServer(id, tab = "overview") {
   shell(null, h("p", { class: "muted" }, "Loading server…"));
@@ -624,6 +627,7 @@ async function viewServer(id, tab = "overview") {
   else if (tab === "welcome") await renderWelcome(body, id, data);
   else if (tab === "leveling") await renderLeveling(body, id, data);
   else if (tab === "verify") await renderVerification(body, id, data);
+  else if (tab === "selfroles") await renderSelfRoles(body, id, data);
   else if (tab === "whitelist") await renderWhitelist(body, id, data);
 }
 
@@ -1659,6 +1663,139 @@ async function renderVerification(body, id, d) {
         h("label", { class: "field" }, h("span", null, "Channel"), chan)),
       h("label", { class: "field" }, h("span", null, "Role to give on verify"), role),
       h("div", { class: "row" }, saveOnly, post)));
+}
+
+/* ---------- Self Roles ---------- */
+async function renderSelfRoles(body, id, d) {
+  let cfg, tags;
+  try { [cfg, tags] = await Promise.all([api(`/api/guilds/${id}/selfroles`), api(`/api/guilds/${id}/selfroles/nicktags`)]); }
+  catch (e) { return failView(e); }
+
+  body.append(
+    h("p", { class: "muted small", style: "margin-bottom:16px" },
+      "Post a message (with an optional GIF and embed) in a channel. Anyone who reacts with a mapped emoji instantly gets that role — no commands needed."));
+
+  body.append(nickTagRolesPanel(id, d, tags));
+
+  body.append(selfRolePanel(id, d, "role", cfg.role, {
+    heading: "Reaction Roles",
+    hint: "React with an emoji → get the matching role. Un-reacting removes it again.",
+  }));
+  body.append(selfRolePanel(id, d, "nick", cfg.nick, {
+    heading: "Reaction Roles + Nickname",
+    hint: "Same idea, but reacting also adds the role's name to the very front of the member's nickname — their exact existing name (fonts, emoji, everything) is kept as-is after it. Un-reacting removes the role and the prefix.",
+  }));
+}
+
+// Nickname Tag Roles: mark a role (e.g. "Super") as a tag role, and ANY time a member gets
+// it — self-role reaction, /addrole, given by hand in Discord, anything — their nickname
+// automatically becomes "<role name> <their real, exact name>". Removing the role restores it.
+function nickTagRolesPanel(id, d, tags) {
+  const roles = d.roles || [];
+  const checks = new Map(); // roleId -> checkbox
+  const roleRows = roles.length
+    ? h("ul", { class: "list" }, roles.map((r) => {
+        const cb = h("input", { type: "checkbox", checked: tags.roleIds.includes(r.id) });
+        checks.set(r.id, cb);
+        return h("li", null,
+          h("div", { class: "grow" }, r.name),
+          h("label", { class: "switch" }, cb, h("i")));
+      }))
+    : h("p", { class: "empty" }, "This server has no roles to tag yet.");
+
+  const save = h("button", { class: "btn", type: "button" }, "Save tag roles");
+  save.onclick = async () => {
+    save.disabled = true;
+    const roleIds = [...checks.entries()].filter(([, cb]) => cb.checked).map(([rid]) => rid);
+    await attempt(() => api(`/api/guilds/${id}/selfroles/nicktags`, { method: "POST", body: { roleIds } }), "Tag roles saved");
+    save.disabled = false;
+  };
+
+  return h("div", { class: "panel", style: "max-width:720px;margin-bottom:20px" },
+    h("h2", null, "Nickname Tag Roles"),
+    h("p", { class: "muted small", style: "margin-bottom:16px" },
+      "Turn on any role here and the bot renames whoever gets it to “<role name> <their name>” automatically — however they get the role (self-role reaction, /addrole, given by hand, anything). Removing the role from someone puts their name back. Turning a role off here only affects future role changes, not people who are already tagged."),
+    roleRows,
+    save);
+}
+
+function selfRolePanel(id, d, kind, cfg, { heading, hint }) {
+  const enabled = h("input", { type: "checkbox", checked: cfg.enabled });
+  const embedOn = h("input", { type: "checkbox", checked: cfg.embed });
+  const title = h("input", { type: "text", placeholder: "Pick your roles!", maxlength: "256" });
+  title.value = cfg.title || "";
+  const text = h("textarea", { placeholder: "React with an emoji below to get a role.", maxlength: "2000" });
+  text.value = cfg.text || "";
+  const chan = channelSelect(d.text, cfg.channel, "Select a channel");
+  const imgSlot = imageSlot({ hasExisting: cfg.hasImage });
+
+  // ---- emoji -> role mapping rows ----
+  const rows = cfg.mappings.map((m) => ({ emoji: m.emoji, roleId: m.roleId }));
+  const rowsBox = h("ul", { class: "list" });
+  const drawRows = () => {
+    const items = rows.map((row, i) => {
+      const emojiInput = h("input", { type: "text", placeholder: "Paste an emoji", style: "width:120px;flex:none" });
+      emojiInput.value = row.emoji || "";
+      emojiInput.oninput = () => { row.emoji = emojiInput.value; };
+      const roleSel = roleSelect(d.roles || [], row.roleId, "Select a role");
+      roleSel.onchange = () => { row.roleId = roleSel.value; };
+      return h("li", null,
+        emojiInput,
+        h("div", { class: "grow" }, roleSel),
+        h("button", { class: "btn danger sm", type: "button", onclick: () => { rows.splice(i, 1); drawRows(); } }, "Remove"));
+    });
+    rowsBox.replaceChildren(...(items.length ? items : [h("li", null, h("span", { class: "muted small" }, "No emoji → role mappings yet."))]));
+  };
+  drawRows();
+  const addRow = h("button", { class: "btn ghost sm", type: "button", style: "margin-top:10px", onclick: () => { rows.push({ emoji: "", roleId: "" }); drawRows(); } }, "+ Add mapping");
+
+  const buildPayload = () => ({
+    enabled: enabled.checked,
+    embed: embedOn.checked,
+    title: title.value,
+    text: text.value,
+    channel: chan.value,
+    image: imgSlot.value,
+    mappings: rows.filter((r) => r.emoji.trim() && r.roleId).map((r) => ({ emoji: r.emoji.trim(), roleId: r.roleId })),
+  });
+
+  const saveOnly = h("button", { class: "btn ghost", type: "button" }, "Save settings");
+  saveOnly.onclick = async () => {
+    saveOnly.disabled = true;
+    await attempt(() => api(`/api/guilds/${id}/selfroles/${kind}`, { method: "POST", body: buildPayload() }), "Saved");
+    saveOnly.disabled = false;
+  };
+
+  const post = h("button", { class: "btn", type: "button" }, cfg.posted ? "Update posted message" : "Post message");
+  post.onclick = async () => {
+    if (!chan.value) return toast("Pick a channel first.", true);
+    if (!rows.some((r) => r.emoji.trim() && r.roleId)) return toast(errText("no_mappings"), true);
+    post.disabled = true;
+    const saved = await attempt(() => api(`/api/guilds/${id}/selfroles/${kind}`, { method: "POST", body: buildPayload() }));
+    if (saved) await attempt(() => api(`/api/guilds/${id}/selfroles/${kind}/post`, { method: "POST" }), "Posted to Discord");
+    post.disabled = false;
+  };
+
+  return h("div", { class: "panel", style: "max-width:720px;margin-bottom:20px" },
+    h("div", { class: "row between" },
+      h("h2", null, heading),
+      h("span", { class: "chip" }, cfg.posted ? `Posted in #${cfg.channel || "?"}` : "Not posted yet")),
+    h("p", { class: "muted small", style: "margin-bottom:16px" }, hint),
+    h("div", { class: "toggle-row" },
+      h("div", null, h("div", { style: "font-weight:600" }, "Enabled"), h("div", { class: "muted small" }, "Turn reacting for a role on or off")),
+      h("label", { class: "switch" }, enabled, h("i"))),
+    h("div", { class: "toggle-row" },
+      h("div", null, h("div", { style: "font-weight:600" }, "Send as an embed"), h("div", { class: "muted small" }, "Off sends it as a plain message instead")),
+      h("label", { class: "switch" }, embedOn, h("i"))),
+    h("label", { class: "field" }, h("span", null, "Title"), title),
+    h("label", { class: "field" }, h("span", null, "Text"), text),
+    h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "GIF / image"), imgSlot.box, imgSlot.fileInput),
+    h("label", { class: "field" }, h("span", null, "Channel"), chan),
+    h("div", { class: "field" },
+      h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Emoji → role"),
+      h("p", { class: "muted small", style: "margin-bottom:8px" }, "Paste a normal emoji, or a custom server emoji (type \\:emojiname: in Discord and copy the result it shows)."),
+      rowsBox, addRow),
+    h("div", { class: "row" }, saveOnly, post));
 }
 
 /* ---------- Whitelist ---------- */
