@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>N1ne — Dashboard</title>
+<title>YAN — Dashboard</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>★</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -136,10 +136,95 @@
   .crumb:hover { color: var(--text); }
   .server-head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
   .server-head .ava { width: 64px; height: 64px; font-size: 1.5rem; }
-  .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 24px; overflow-x: auto; }
-  .tab { padding: 10px 18px; color: var(--muted); text-decoration: none; font-weight: 600; border-bottom: 3px solid transparent; white-space: nowrap; }
-  .tab:hover { color: var(--text); }
-  .tab.active { color: var(--text); border-bottom-color: var(--text); }
+  /* ---------- section nav: black planets, each with a white ring that glows its own colour ---------- */
+  /* positions are randomized in JS (scatterLayout) and placed here via each slot's inline left/top */
+  .tabs {
+    position: relative; margin: 10px 0 40px; padding: 20px 14px 30px; border-bottom: none; overflow: visible;
+  }
+  .tab-slot { position: absolute; transform: translate(-50%, -50%); }
+  .tab {
+    position: relative; display: flex; width: 106px; height: 106px; border-radius: 50%;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 12px; color: #fff; text-decoration: none; font-weight: 700; font-size: .8rem; line-height: 1.2;
+    background:
+      radial-gradient(circle at 30% 26%, rgba(255,255,255,.16), transparent 30%),
+      radial-gradient(circle at 34% 30%, #3c3c40 0%, #17171a 55%, #000 100%);
+    box-shadow: inset -10px -14px 22px rgba(0,0,0,.75), inset 5px 5px 12px rgba(255,255,255,.05), 0 8px 22px rgba(0,0,0,.6);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  /* the ring: white, tilted like Saturn's, glowing in the category's own colour */
+  .tab::before {
+    content: ""; position: absolute; inset: -24% -8%; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.85);
+    box-shadow: 0 0 10px 1px hsl(var(--hue, 260) 90% 65% / .8), 0 0 24px 5px hsl(var(--hue, 260) 90% 60% / .45);
+    transform: rotate(-20deg) scaleY(.3);
+    transition: box-shadow .18s ease, border-color .18s ease;
+    pointer-events: none;
+  }
+  .tab:hover {
+    color: #fff; transform: translateY(-6px) scale(1.06);
+    box-shadow: inset -10px -14px 22px rgba(0,0,0,.75), inset 5px 5px 12px rgba(255,255,255,.05), 0 14px 30px rgba(0,0,0,.65);
+  }
+  .tab:hover::before {
+    box-shadow: 0 0 14px 2px hsl(var(--hue, 260) 95% 68% / .95), 0 0 34px 8px hsl(var(--hue, 260) 95% 62% / .6);
+  }
+  .tab.active { transform: scale(1.1); }
+  .tab.active::before {
+    border-color: #fff;
+    box-shadow: 0 0 18px 3px hsl(var(--hue, 260) 95% 70% / 1), 0 0 40px 10px hsl(var(--hue, 260) 95% 62% / .7);
+  }
+  /* a little moon riding the ring, forever orbiting — this is what makes the nav feel alive
+     even before you touch it. The rotate/scaleY squash on .orbit turns the child's plain
+     circular spin into the same tilted ellipse the ring itself is drawn as. */
+  .tab .orbit {
+    position: absolute; inset: -24% -8%; border-radius: 50%;
+    transform: rotate(-20deg) scaleY(.3);
+    pointer-events: none;
+  }
+  .tab .spin { position: absolute; inset: 0; border-radius: 50%; animation: tab-spin 7s linear infinite; }
+  .tab-slot:nth-child(3n) .spin { animation-duration: 9s; }
+  .tab-slot:nth-child(2n) .spin { animation-duration: 5.5s; animation-direction: reverse; }
+  .tab .moon {
+    position: absolute; top: -3px; left: 50%; width: 7px; height: 7px; margin-left: -3.5px;
+    border-radius: 50%; background: #fff;
+    box-shadow: 0 0 6px 2px hsl(var(--hue, 260) 95% 70% / .9);
+  }
+  @keyframes tab-spin { to { transform: rotate(360deg); } }
+  /* reacts on hover: the moon speeds up and glows harder, like it noticed you */
+  .tab:hover .spin { animation-duration: 2.2s; }
+  .tab:hover .moon { box-shadow: 0 0 10px 4px hsl(var(--hue, 260) 95% 72% / 1); }
+  /* ---------- the "ME" planet: your own Discord avatar as the sphere ---------- */
+  .tab.me {
+    background: radial-gradient(circle at 34% 30%, #3c3c40 0%, #17171a 55%, #000 100%);
+  }
+  .tab.me .me-img {
+    position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%;
+    object-fit: cover; opacity: .8; filter: saturate(1.05);
+  }
+  .tab.me .me-shade {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle at 30% 26%, rgba(255,255,255,.22), transparent 32%), radial-gradient(circle at 65% 75%, rgba(0,0,0,.55), transparent 60%);
+  }
+  .tab.me .me-label {
+    position: relative; z-index: 2; font-size: .95rem; letter-spacing: .06em;
+    text-shadow: 0 2px 8px rgba(0,0,0,.9), 0 0 14px rgba(0,0,0,.6);
+  }
+  .tab.me .me-card {
+    position: absolute; top: 112%; left: 50%; transform: translateX(-50%) translateY(-4px);
+    background: #0b0b0e; border: 1px solid rgba(255,255,255,.16); border-radius: 12px;
+    padding: 8px 14px; font-size: .74rem; font-weight: 600; white-space: nowrap; text-align: center;
+    box-shadow: 0 10px 26px rgba(0,0,0,.55); opacity: 0; pointer-events: none; z-index: 5;
+    transition: opacity .15s ease, transform .15s ease;
+  }
+  .tab.me:hover .me-card, .tab.me:focus-visible .me-card { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .tab.me .me-card .muted { display: block; font-weight: 400; margin-top: 2px; }
+  @media (max-width: 560px) {
+    /* absolute scatter gets cramped at phone width — fall back to a simple wrapping row */
+    .tabs { display: flex; flex-wrap: wrap; gap: 22px; height: auto !important; padding: 14px 6px 6px; }
+    .tab-slot { position: static; transform: none; }
+    .tab { width: 80px; height: 80px; font-size: .68rem; padding: 8px; }
+    .tab.me .me-card { top: auto; bottom: 112%; }
+  }
   .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
   .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
   .stat b { display: block; font-size: 1.8rem; }
@@ -353,6 +438,29 @@ async function attempt(fn, okMsg) {
 
 function hueOf(id) { let n = 0; for (const c of String(id)) n = (n * 31 + c.charCodeAt(0)) % 360; return n; }
 
+// Scatters n planets across a loose grid (so they never pile up or overlap much) but shuffles
+// which slot each one lands in and jitters it, so the layout reads as random rather than a
+// tidy row. Freshly randomized on every page load/navigation, not fixed positions.
+function scatterLayout(n) {
+  const cols = Math.max(2, Math.ceil(Math.sqrt(n * 1.7)));
+  const rows = Math.ceil(n / cols);
+  const cellH = 128;
+  const slots = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) slots.push({ c, r });
+  for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
+  const cellW = 100 / cols;
+  const out = slots.slice(0, n).map(({ c, r }) => ({
+    left: Math.min(94, Math.max(6, c * cellW + cellW / 2 + (Math.random() - 0.5) * cellW * 0.7)),
+    top: r * cellH + cellH / 2 + (Math.random() - 0.5) * cellH * 0.55,
+  }));
+  return { positions: out, height: rows * cellH };
+}
+
+// The little moon that rides each planet's ring, forever orbiting (speeds up on hover via CSS).
+function orbitNode() {
+  return h("i", { class: "orbit" }, h("i", { class: "spin" }, h("i", { class: "moon" })));
+}
+
 // "Add to server" link. With a guildId it pre-selects that server.
 function inviteUrl(guildId) {
   return `https://discord.com/oauth2/authorize?client_id=${CONFIG.CLIENT_ID}&scope=bot%20applications.commands&permissions=8` +
@@ -390,7 +498,20 @@ function avatar(id, name, url, cls = "") {
 (function sky() {
   const c = document.getElementById("sky"), ctx = c.getContext("2d");
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let stars = [], w = 0, h_ = 0;
+  let stars = [], shots = [], w = 0, h_ = 0;
+  function spawnShot() {
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const angle = (Math.random() * 18 + 18) * Math.PI / 180;
+    const speed = Math.random() * 7 + 9;
+    shots.push({
+      x: Math.random() * w * 0.7 + w * 0.15,
+      y: Math.random() * h_ * 0.35,
+      vx: dir * speed * Math.cos(angle),
+      vy: speed * Math.sin(angle),
+      len: Math.random() * 70 + 60,
+      life: 0, maxLife: 36 + Math.random() * 20,
+    });
+  }
   function resize() {
     const dpr = Math.min(devicePixelRatio || 1, 2);
     w = innerWidth; h_ = innerHeight;
@@ -413,6 +534,27 @@ function avatar(id, name, url, cls = "") {
       ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.283); ctx.fill();
     }
     ctx.globalAlpha = 1;
+
+    if (!still) {
+      if (Math.random() < 0.006) spawnShot();
+      for (let i = shots.length - 1; i >= 0; i--) {
+        const sh = shots[i];
+        sh.x += sh.vx; sh.y += sh.vy; sh.life++;
+        const fade = 1 - sh.life / sh.maxLife;
+        if (fade <= 0 || sh.x < -100 || sh.x > w + 100 || sh.y > h_ + 100) { shots.splice(i, 1); continue; }
+        const mag = Math.hypot(sh.vx, sh.vy) || 1;
+        const tailX = sh.x - (sh.vx / mag) * sh.len, tailY = sh.y - (sh.vy / mag) * sh.len;
+        const grad = ctx.createLinearGradient(sh.x, sh.y, tailX, tailY);
+        grad.addColorStop(0, `rgba(255,255,255,${fade})`);
+        grad.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.strokeStyle = grad; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(tailX, tailY); ctx.stroke();
+        ctx.globalAlpha = fade; ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(sh.x, sh.y, 1.6, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
     if (!still) requestAnimationFrame(draw);
   }
   addEventListener("resize", () => { resize(); });
@@ -516,7 +658,7 @@ function avatar(id, name, url, cls = "") {
    ===================================================================== */
 function header(user) {
   return h("header", { class: "top" },
-    h("a", { class: "brand", href: "#/dashboard" }, "★ N1ne"),
+    h("a", { class: "brand", href: "#/dashboard" }, "★ YAN"),
     user && h("nav", { class: "nav" },
       h("a", { class: "link", href: "#/dashboard" }, "Dashboard"),
       inviteButton("btn ghost sm", "+ Add to server"),
@@ -525,7 +667,7 @@ function header(user) {
         h("span", { class: "name" }, user.username)),
       h("button", { class: "btn ghost sm", type: "button", onclick: logout }, "Logout")));
 }
-const footer = () => h("footer", null, "© N1ne · Not affiliated with Discord Inc.");
+const footer = () => h("footer", null, "© YAN · Not affiliated with Discord Inc.");
 
 function shell(user, ...content) {
   $app.replaceChildren(header(user), h("main", null, ...content), footer());
@@ -549,12 +691,12 @@ function viewLogin(query) {
     h("main", null,
       h("div", { class: "hero" },
         h("div", { class: "big-star" }, "★"),
-        h("h1", null, "N1ne"),
+        h("h1", null, "YAN"),
         h("p", { class: "lead" }, "Manage your Discord servers, warnings and auto replies from one place."),
         h("div", { class: "login-box panel" },
           err && h("div", { class: "banner-error" }, errText(err)),
           h("button", { class: "btn", type: "button", style: "width:100%", onclick: go }, "Login with Discord")),
-        h("div", { style: "margin-top:16px" }, inviteButton("btn ghost", "+ Add N1ne to a server")))),
+        h("div", { style: "margin-top:16px" }, inviteButton("btn ghost", "+ Add YAN to a server")))),
     footer());
 }
 
@@ -584,7 +726,7 @@ async function viewDashboard() {
       h("div", null,
         h("h1", { style: "margin-bottom:6px" }, "Your servers"),
         h("p", { class: "muted" }, "Servers where you can manage things. Pick one to open its settings.")),
-      inviteButton("btn", "+ Add N1ne to a server")),
+      inviteButton("btn", "+ Add YAN to a server")),
     guilds.length ? grid : h("div", { class: "dashed" }, "No servers found. You need the Manage Server permission in a server to see it here."));
 }
 
@@ -614,9 +756,25 @@ async function viewServer(id, tab = "overview") {
     h("div", { class: "server-head" },
       avatar(id, data.name, guildIcon({ id, icon: data.icon })),
       h("div", null, h("h1", null, data.name), h("p", { class: "muted" }, `${data.members} members`))),
-    h("nav", { class: "tabs", "aria-label": "Server sections" },
-      TABS.map(([key, label]) =>
-        h("a", { class: "tab" + (key === tab ? " active" : ""), href: `#/server/${id}/${key}`, "aria-current": key === tab ? "page" : null }, label))),
+    (() => {
+      const layout = scatterLayout(TABS.length);
+      const meUrl = userAvatar(user);
+      return h("nav", { class: "tabs", "aria-label": "Server sections", style: `height:${layout.height + 120}px` },
+        TABS.map(([key, label], i) => {
+          const pos = layout.positions[i];
+          return h("div", { class: "tab-slot", style: `left:${pos.left}%;top:${pos.top}px` },
+            h("a", { class: "tab" + (key === tab ? " active" : ""), style: `--hue:${hueOf(key)}`, href: `#/server/${id}/${key}`, "aria-current": key === tab ? "page" : null },
+              orbitNode(), h("span", { class: "tab-label" }, label)));
+        }),
+        // the "ME" planet — your own Discord avatar, parked bottom-left like a home base
+        h("div", { class: "tab-slot", style: `left:9%;top:${layout.height + 60}px` },
+          h("div", { class: "tab me", style: `--hue:${hueOf(user.id)}`, tabindex: "0" },
+            orbitNode(),
+            meUrl ? h("img", { class: "me-img", src: meUrl, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : null,
+            h("i", { class: "me-shade" }),
+            h("span", { class: "me-label" }, "ME"),
+            h("div", { class: "me-card" }, h("b", null, user.username), h("span", { class: "muted" }, `#${user.id.slice(-4)}`)))));
+    })(),
     body);
 
   const refresh = () => viewServer(id, tab);
@@ -1503,7 +1661,7 @@ async function renderLeveling(body, id, d) {
       saveGeneral),
     h("div", { class: "panel" },
       h("h2", null, "Leveling Commands"),
-      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Turn individual slash commands on or off. Members still need to be whitelisted (see the Whitelist tab) to use any N1ne command."),
+      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Turn individual slash commands on or off. Members still need to be whitelisted (see the Whitelist tab) to use any YAN command."),
       commandToggleRow("top", "/top", "Shows the server's XP leaderboard", cfg.commands?.top !== false),
       commandToggleRow("rank", "/rank", "Shows your (or someone else's) level and XP", cfg.commands?.rank !== false),
       commandToggleRow("reset", "/reset", "Resets a member's XP to 0 · requires Manage Roles", cfg.commands?.reset !== false),
@@ -1830,12 +1988,12 @@ async function renderWhitelist(body, id, d) {
     h("div", { class: "panel" },
       h("h2", null, "Whitelist"),
       h("p", { class: "muted small", style: "margin-bottom:16px" },
-        "Pick which roles are allowed to use N1ne's slash commands (like /top, /rank, /jail). Leave everything off and N1ne stays open to the whole server. Server admins (Manage Server) can always use N1ne's commands, whitelist or not."),
+        "Pick which roles are allowed to use YAN's slash commands (like /top, /rank, /jail). Leave everything off and YAN stays open to the whole server. Server admins (Manage Server) can always use YAN's commands, whitelist or not."),
       roleRows,
       save),
     h("div", { class: "panel" },
       h("h2", null, "Dashboard link"),
-      h("p", { class: "muted small", style: "margin-bottom:14px" }, "Anyone allowed to use N1ne gets this link when they type /dashboard in Discord."),
+      h("p", { class: "muted small", style: "margin-bottom:14px" }, "Anyone allowed to use YAN gets this link when they type /dashboard in Discord."),
       h("span", { class: "chip" }, dashUrl)));
 }
 
@@ -1855,7 +2013,7 @@ function route() {
   location.hash = "#/dashboard";
 }
 
-// Grab the real CLIENT_ID from web.js before the first render, so the "Add N1ne
+// Grab the real CLIENT_ID from web.js before the first render, so the "Add YAN
 // to a server" button works immediately without anyone editing this file by hand.
 (async () => {
   try {
