@@ -1836,6 +1836,7 @@ async function renderDestroyServer(body, id, d) {
   const startDeletingText = h("textarea", { placeholder: "Deleting everything now.", maxlength: "500" });
   startDeletingText.value = cfg.startDeletingText || "";
   const deleteAfter = h("input", { type: "checkbox", checked: cfg.deleteAfter });
+  const renameServer = h("input", { type: "checkbox", checked: cfg.renameServer });
   const color = h("input", { type: "color" });
   color.value = /^#[0-9a-fA-F]{6}$/.test(cfg.color) ? cfg.color : "#ff0000";
   const role = roleSelect(d.roles || [], cfg.roleId, "Only owner / Administrators");
@@ -1847,6 +1848,7 @@ async function renderDestroyServer(body, id, d) {
     deleteDelaySeconds: deleteDelaySeconds.value,
     startDeletingText: startDeletingText.value,
     deleteAfter: deleteAfter.checked,
+    renameServer: renameServer.checked,
     color: color.value,
     roleId: role.value,
     gif: gifSlot.value,
@@ -1877,11 +1879,15 @@ async function renderDestroyServer(body, id, d) {
         h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "Channel name changes, in order"),
         h("p", { class: "muted small", style: "margin-bottom:8px" }, "Every channel gets renamed to this text, then it waits the number of seconds you set before moving to the next one. Example: “sky is starting” for 10 sec, then “sky is king” for 10 sec."),
         stagesBox, addStage),
+      h("div", { class: "toggle-row" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Also rename the server itself"), h("div", { class: "muted small" }, "On = the server's actual name changes to match each stage's text too, not just the channels")),
+        h("label", { class: "switch" }, renameServer, h("i"))),
       h("label", { class: "field" }, h("span", null, "“Done changing” message"), doneChangingText),
       h("p", { class: "muted small", style: "margin-bottom:16px" }, "Sent right after the last name change finishes."),
       h("label", { class: "field" }, h("span", null, "Wait this many seconds before deleting"), deleteDelaySeconds),
       h("label", { class: "field" }, h("span", null, "“Start deleting” message"), startDeletingText),
-      h("p", { class: "muted small", style: "margin-bottom:16px" }, "Sent right before channels actually start getting deleted."),
+      h("p", { class: "muted small", style: "margin-bottom:16px" },
+        "Sent as soon as the wait above starts. Put {countdown} anywhere in it to show a live “deleting in X minutes” timer that ticks down on its own — e.g. “Deleting everything {countdown}.”"),
       h("div", { class: "toggle-row" },
         h("div", null, h("div", { style: "font-weight:600" }, "Delete all channels at the end"), h("div", { class: "muted small" }, "Off = the sequence just stops after the “start deleting” message")),
         h("label", { class: "switch" }, deleteAfter, h("i"))),
