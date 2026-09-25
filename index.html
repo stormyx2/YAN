@@ -33,7 +33,7 @@
   }
   #sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
   #app { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
-  main { width: 100%; max-width: 1100px; margin: 0 auto; padding: 28px 24px 64px; flex: 1; }
+  main { width: 100%; max-width: 1280px; margin: 0 auto; padding: 28px 24px 64px; flex: 1; }
 
   a { color: inherit; }
   h1, h2, h3 { line-height: 1.2; margin: 0; }
@@ -48,7 +48,7 @@
   header.top {
     position: relative; z-index: 2;
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    max-width: 1100px; width: 100%; margin: 0 auto; padding: 22px 24px 0;
+    max-width: 1280px; width: 100%; margin: 0 auto; padding: 22px 24px 0;
   }
   .brand { display: flex; align-items: center; gap: 10px; font-size: 1.7rem; font-weight: 700; letter-spacing: .12em; text-decoration: none; }
   .nav { display: flex; align-items: center; gap: 16px; }
@@ -71,7 +71,7 @@
   .btn.danger:hover { background: rgba(255,107,107,.12); filter: none; }
   .btn.sm { padding: 6px 14px; font-size: .85rem; }
   .btn[disabled] { opacity: .5; cursor: not-allowed; }
-  .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .tab:focus-visible, .drop:focus-visible {
+  .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .side-link:focus-visible, .drop:focus-visible {
     outline: 3px solid var(--focus); outline-offset: 2px;
   }
 
@@ -136,95 +136,50 @@
   .crumb:hover { color: var(--text); }
   .server-head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
   .server-head .ava { width: 64px; height: 64px; font-size: 1.5rem; }
-  /* ---------- section nav: black planets, each with a white ring that glows its own colour ---------- */
-  /* positions are randomized in JS (scatterLayout) and placed here via each slot's inline left/top */
-  .tabs {
-    position: relative; margin: 10px 0 40px; padding: 20px 14px 30px; border-bottom: none; overflow: visible;
+
+  /* ---------- section nav: Wick-style vertical sidebar ---------- */
+  /* Every section sits on its own row, one under the other, grouped under small headings.
+     The list scrolls up/down on its own if it's taller than the screen — no sideways scroll and
+     no visible scrollbar line. */
+  .server-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .side {
+    position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overflow-x: hidden;
+    background: #05070d; border: 1px solid var(--line); border-radius: 16px; padding: 12px 10px 14px;
+    scrollbar-width: none; /* Firefox: hide the scrollbar line */
   }
-  .tab-slot { position: absolute; transform: translate(-50%, -50%); }
-  .tab {
-    position: relative; display: flex; width: 106px; height: 106px; border-radius: 50%;
-    align-items: center; justify-content: center; text-align: center;
-    padding: 12px; color: #fff; text-decoration: none; font-weight: 700; font-size: .8rem; line-height: 1.2;
-    background:
-      radial-gradient(circle at 30% 26%, rgba(255,255,255,.16), transparent 30%),
-      radial-gradient(circle at 34% 30%, #3c3c40 0%, #17171a 55%, #000 100%);
-    box-shadow: inset -10px -14px 22px rgba(0,0,0,.75), inset 5px 5px 12px rgba(255,255,255,.05), 0 8px 22px rgba(0,0,0,.6);
-    transition: transform .18s ease, box-shadow .18s ease;
+  .side::-webkit-scrollbar { display: none; } /* Chrome/Edge/Safari: hide the scrollbar line */
+  .side-server {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 8px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+    text-decoration: none; font-weight: 700; font-size: .95rem;
   }
-  /* the ring: white, tilted like Saturn's, glowing in the category's own colour */
-  .tab::before {
-    content: ""; position: absolute; inset: -24% -8%; border-radius: 50%;
-    border: 2px solid rgba(255,255,255,.85);
-    box-shadow: 0 0 10px 1px hsl(var(--hue, 260) 90% 65% / .8), 0 0 24px 5px hsl(var(--hue, 260) 90% 60% / .45);
-    transform: rotate(-20deg) scaleY(.3);
-    transition: box-shadow .18s ease, border-color .18s ease;
-    pointer-events: none;
+  .side-server:hover { border-color: var(--muted); }
+  .side-server .ava { width: 28px; height: 28px; font-size: .8rem; }
+  .side-server .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .side-server .sw { color: var(--muted); font-size: .8rem; }
+  .side-group {
+    margin: 16px 10px 6px; font-size: .78rem; font-weight: 700; letter-spacing: .04em;
+    color: var(--muted); font-family: 'Noto Sans', sans-serif;
   }
-  .tab:hover {
-    color: #fff; transform: translateY(-6px) scale(1.06);
-    box-shadow: inset -10px -14px 22px rgba(0,0,0,.75), inset 5px 5px 12px rgba(255,255,255,.05), 0 14px 30px rgba(0,0,0,.65);
+  .side-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .side-link {
+    display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px;
+    color: #c9c9d1; text-decoration: none; font-family: 'Noto Sans', sans-serif; font-size: .95rem;
+    transition: background .12s ease, color .12s ease;
   }
-  .tab:hover::before {
-    box-shadow: 0 0 14px 2px hsl(var(--hue, 260) 95% 68% / .95), 0 0 34px 8px hsl(var(--hue, 260) 95% 62% / .6);
+  .side-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+  .side-link.active { background: rgba(255,255,255,.1); color: #fff; font-weight: 700; }
+  .side-ico { width: 20px; height: 20px; flex: none; display: grid; place-items: center; opacity: .85; }
+  .side-ico svg { width: 20px; height: 20px; }
+  .side-link .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .side-link .chev { width: 16px; height: 16px; opacity: .5; flex: none; }
+  .server-content { min-width: 0; }
+  @media (max-width: 860px) {
+    /* phones/small screens: sidebar sits on top, still one row per section, list stays vertical */
+    .server-layout { grid-template-columns: 1fr; }
+    .side { position: static; max-height: none; }
   }
-  .tab.active { transform: scale(1.1); }
-  .tab.active::before {
-    border-color: #fff;
-    box-shadow: 0 0 18px 3px hsl(var(--hue, 260) 95% 70% / 1), 0 0 40px 10px hsl(var(--hue, 260) 95% 62% / .7);
-  }
-  /* a little moon riding the ring, forever orbiting — this is what makes the nav feel alive
-     even before you touch it. The rotate/scaleY squash on .orbit turns the child's plain
-     circular spin into the same tilted ellipse the ring itself is drawn as. */
-  .tab .orbit {
-    position: absolute; inset: -24% -8%; border-radius: 50%;
-    transform: rotate(-20deg) scaleY(.3);
-    pointer-events: none;
-  }
-  .tab .spin { position: absolute; inset: 0; border-radius: 50%; animation: tab-spin 7s linear infinite; }
-  .tab-slot:nth-child(3n) .spin { animation-duration: 9s; }
-  .tab-slot:nth-child(2n) .spin { animation-duration: 5.5s; animation-direction: reverse; }
-  .tab .moon {
-    position: absolute; top: -3px; left: 50%; width: 7px; height: 7px; margin-left: -3.5px;
-    border-radius: 50%; background: #fff;
-    box-shadow: 0 0 6px 2px hsl(var(--hue, 260) 95% 70% / .9);
-  }
-  @keyframes tab-spin { to { transform: rotate(360deg); } }
-  /* reacts on hover: the moon speeds up and glows harder, like it noticed you */
-  .tab:hover .spin { animation-duration: 2.2s; }
-  .tab:hover .moon { box-shadow: 0 0 10px 4px hsl(var(--hue, 260) 95% 72% / 1); }
-  /* ---------- the "ME" planet: your own Discord avatar as the sphere ---------- */
-  .tab.me {
-    background: radial-gradient(circle at 34% 30%, #3c3c40 0%, #17171a 55%, #000 100%);
-  }
-  .tab.me .me-img {
-    position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%;
-    object-fit: cover; opacity: .8; filter: saturate(1.05);
-  }
-  .tab.me .me-shade {
-    position: absolute; inset: 0; border-radius: 50%;
-    background: radial-gradient(circle at 30% 26%, rgba(255,255,255,.22), transparent 32%), radial-gradient(circle at 65% 75%, rgba(0,0,0,.55), transparent 60%);
-  }
-  .tab.me .me-label {
-    position: relative; z-index: 2; font-size: .95rem; letter-spacing: .06em;
-    text-shadow: 0 2px 8px rgba(0,0,0,.9), 0 0 14px rgba(0,0,0,.6);
-  }
-  .tab.me .me-card {
-    position: absolute; top: 112%; left: 50%; transform: translateX(-50%) translateY(-4px);
-    background: #0b0b0e; border: 1px solid rgba(255,255,255,.16); border-radius: 12px;
-    padding: 8px 14px; font-size: .74rem; font-weight: 600; white-space: nowrap; text-align: center;
-    box-shadow: 0 10px 26px rgba(0,0,0,.55); opacity: 0; pointer-events: none; z-index: 5;
-    transition: opacity .15s ease, transform .15s ease;
-  }
-  .tab.me:hover .me-card, .tab.me:focus-visible .me-card { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .tab.me .me-card .muted { display: block; font-weight: 400; margin-top: 2px; }
-  @media (max-width: 560px) {
-    /* absolute scatter gets cramped at phone width — fall back to a simple wrapping row */
-    .tabs { display: flex; flex-wrap: wrap; gap: 22px; height: auto !important; padding: 14px 6px 6px; }
-    .tab-slot { position: static; transform: none; }
-    .tab { width: 80px; height: 80px; font-size: .68rem; padding: 8px; }
-    .tab.me .me-card { top: auto; bottom: 112%; }
-  }
+
   .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
   .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
   .stat b { display: block; font-size: 1.8rem; }
@@ -399,6 +354,7 @@ const ERRORS = {
   purge_failed: "Couldn't delete those messages — they might be older than 14 days, which Discord won't let bots bulk-delete.",
   no_jail_role: "Pick and save a jail role first.",
   missing_manage_roles: "The bot needs the Manage Roles permission, and its own role must sit above the jail role and the member's other roles.",
+  invalid_duration: "That time didn't look right. Use something like 1m 2d 4h 2m 12s, 2h 30m or 45s (max 1 year).",
   no_mappings: "Add at least one emoji → role mapping first.",
   invalid_emoji: "That emoji didn't look right. Paste a real emoji, or a custom emoji copied from Discord.",
   duplicate_emoji: "You used the same emoji twice — each emoji can only map to one role.",
@@ -438,27 +394,41 @@ async function attempt(fn, okMsg) {
 
 function hueOf(id) { let n = 0; for (const c of String(id)) n = (n * 31 + c.charCodeAt(0)) % 360; return n; }
 
-// Scatters n planets across a loose grid (so they never pile up or overlap much) but shuffles
-// which slot each one lands in and jitters it, so the layout reads as random rather than a
-// tidy row. Freshly randomized on every page load/navigation, not fixed positions.
-function scatterLayout(n) {
-  const cols = Math.max(2, Math.ceil(Math.sqrt(n * 1.7)));
-  const rows = Math.ceil(n / cols);
-  const cellH = 128;
-  const slots = [];
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) slots.push({ c, r });
-  for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
-  const cellW = 100 / cols;
-  const out = slots.slice(0, n).map(({ c, r }) => ({
-    left: Math.min(94, Math.max(6, c * cellW + cellW / 2 + (Math.random() - 0.5) * cellW * 0.7)),
-    top: r * cellH + cellH / 2 + (Math.random() - 0.5) * cellH * 0.55,
-  }));
-  return { positions: out, height: rows * cellH };
+// Same format the bot uses in Discord: "1mo 2d 4h 2m 12s" (mo = months, m = minutes).
+function fmtLeft(ms) {
+  let s = Math.max(0, Math.ceil(ms / 1000));
+  const mo = Math.floor(s / 2592000); s -= mo * 2592000;
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const hr = Math.floor(s / 3600); s -= hr * 3600;
+  const mi = Math.floor(s / 60); s -= mi * 60;
+  const parts = [];
+  if (mo) parts.push(mo + "mo");
+  if (d) parts.push(d + "d");
+  if (hr) parts.push(hr + "h");
+  if (mi) parts.push(mi + "m");
+  if (s) parts.push(s + "s");
+  return parts.join(" ") || "0s";
 }
 
-// The little moon that rides each planet's ring, forever orbiting (speeds up on hover via CSS).
-function orbitNode() {
-  return h("i", { class: "orbit" }, h("i", { class: "spin" }, h("i", { class: "moon" })));
+// Sidebar icons (simple line icons, drawn in the current text colour).
+const ICON_PATHS = {
+  overview: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  say: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  moderation: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  whitelist: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  autoreply: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v6"/>',
+  welcome: '<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2M19 8v6M22 11h-6"/>',
+  leveling: '<path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/>',
+  verify: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>',
+  selfroles: '<circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M16 3.13a4 4 0 0 1 0 7.75M21 21v-2a4 4 0 0 0-3-3.85"/>',
+  chevron: '<path d="M9 18l6-6-6-6"/>',
+};
+function icon(name, cls = "side-ico") {
+  const span = document.createElement("span");
+  span.className = cls;
+  span.setAttribute("aria-hidden", "true");
+  span.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name] || ""}</svg>`;
+  return span;
 }
 
 // "Add to server" link. With a guildId it pre-selects that server.
@@ -742,7 +712,27 @@ function failView(e) {
 }
 
 /* ---------- Server page ---------- */
-const TABS = [["overview", "Overview"], ["say", "Send message"], ["moderation", "Moderation"], ["autoreply", "Auto reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"], ["selfroles", "Self Roles"], ["whitelist", "Whitelist"]];
+// Sidebar sections, Wick-style: grouped under small headings, one row each.
+const TAB_GROUPS = [
+  ["Moderation Settings", [["overview", "General"], ["moderation", "Moderation"], ["whitelist", "Whitelist"]]],
+  ["General Settings", [["say", "Send message"], ["autoreply", "Auto Reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"], ["selfroles", "Self Roles"]]],
+];
+const TABS = TAB_GROUPS.flatMap(([, items]) => items);
+
+function sidebar(id, data, tab) {
+  return h("aside", { class: "side", "aria-label": "Server sections" },
+    h("a", { class: "side-server", href: "#/dashboard", title: "Switch server" },
+      avatar(id, data.name, guildIcon({ id, icon: data.icon }, 64)),
+      h("span", { class: "nm" }, data.name),
+      h("span", { class: "sw" }, "⇅")),
+    TAB_GROUPS.map(([groupName, items]) => [
+      h("div", { class: "side-group" }, groupName),
+      h("ul", { class: "side-list" }, items.map(([key, label]) =>
+        h("li", null,
+          h("a", { class: "side-link" + (key === tab ? " active" : ""), href: `#/server/${id}/${key}`, "aria-current": key === tab ? "page" : null },
+            icon(key), h("span", { class: "lbl" }, label), icon("chevron", "chev"))))),
+    ]));
+}
 
 async function viewServer(id, tab = "overview") {
   shell(null, h("p", { class: "muted" }, "Loading server…"));
@@ -752,30 +742,14 @@ async function viewServer(id, tab = "overview") {
 
   const body = h("div");
   shell(user,
-    h("a", { class: "crumb", href: "#/dashboard" }, "← All servers"),
-    h("div", { class: "server-head" },
-      avatar(id, data.name, guildIcon({ id, icon: data.icon })),
-      h("div", null, h("h1", null, data.name), h("p", { class: "muted" }, `${data.members} members`))),
-    (() => {
-      const layout = scatterLayout(TABS.length);
-      const meUrl = userAvatar(user);
-      return h("nav", { class: "tabs", "aria-label": "Server sections", style: `height:${layout.height + 120}px` },
-        TABS.map(([key, label], i) => {
-          const pos = layout.positions[i];
-          return h("div", { class: "tab-slot", style: `left:${pos.left}%;top:${pos.top}px` },
-            h("a", { class: "tab" + (key === tab ? " active" : ""), style: `--hue:${hueOf(key)}`, href: `#/server/${id}/${key}`, "aria-current": key === tab ? "page" : null },
-              orbitNode(), h("span", { class: "tab-label" }, label)));
-        }),
-        // the "ME" planet — your own Discord avatar, parked bottom-left like a home base
-        h("div", { class: "tab-slot", style: `left:9%;top:${layout.height + 60}px` },
-          h("div", { class: "tab me", style: `--hue:${hueOf(user.id)}`, tabindex: "0" },
-            orbitNode(),
-            meUrl ? h("img", { class: "me-img", src: meUrl, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : null,
-            h("i", { class: "me-shade" }),
-            h("span", { class: "me-label" }, "ME"),
-            h("div", { class: "me-card" }, h("b", null, user.username), h("span", { class: "muted" }, `#${user.id.slice(-4)}`)))));
-    })(),
-    body);
+    h("div", { class: "server-layout" },
+      sidebar(id, data, tab),
+      h("div", { class: "server-content" },
+        h("a", { class: "crumb", href: "#/dashboard" }, "← All servers"),
+        h("div", { class: "server-head" },
+          avatar(id, data.name, guildIcon({ id, icon: data.icon })),
+          h("div", null, h("h1", null, data.name), h("p", { class: "muted" }, `${data.members} members`))),
+        body)));
 
   const refresh = () => viewServer(id, tab);
   if (tab === "overview") renderOverview(body, id, data, refresh);
@@ -921,7 +895,7 @@ async function renderModeration(body, id, d, refresh) {
     await attempt(() => api(`/api/guilds/${id}/mod-messages/warn`, { method: "POST", body: payload }), "Warn DM saved");
   };
 
-  const jailDmMessage = h("textarea", { placeholder: "You've been jailed in {server}.", maxlength: "1500", style: "min-height:70px" });
+  const jailDmMessage = h("textarea", { placeholder: "You've been jailed in {server} for {time}.", maxlength: "1500", style: "min-height:70px" });
   jailDmMessage.value = modMsg.jail.message || "";
   const jailImg = imageSlot({ hasExisting: modMsg.jail.hasImage });
   const saveJailDm = h("button", { class: "btn ghost sm", type: "button" }, "Save jail DM");
@@ -950,16 +924,58 @@ async function renderModeration(body, id, d, refresh) {
   saveJailRole.onclick = async () => {
     await attempt(() => api(`/api/guilds/${id}/jail/role`, { method: "POST", body: { role: jailRoleSel.value } }), "Jail role saved");
   };
+
+  // Where the live countdown gets posted when someone is jailed for a set time.
+  const timerChanSel = channelSelect(d.text, jail.timerChannel, "Same channel /jail was used in");
+  const saveTimerChan = h("button", { class: "btn ghost sm", type: "button" }, "Save timer channel");
+  saveTimerChan.onclick = async () => {
+    await attempt(() => api(`/api/guilds/${id}/jail/timer-channel`, { method: "POST", body: { channel: timerChanSel.value } }), "Timer channel saved");
+  };
+
   const jailUser = h("input", { type: "text", placeholder: "Username or @name", maxlength: "64" });
+  const jailTime = h("input", { type: "text", placeholder: "e.g. 1m 2d 4h 2m 12s · leave empty for forever", maxlength: "60" });
   const jailBtn = h("button", { class: "btn danger", type: "button" }, "Jail member");
   jailBtn.onclick = async () => {
     if (!jailRoleSel.value) return toast(errText("no_jail_role"), true);
     if (!jailUser.value.trim()) return toast(errText("missing_fields"), true);
-    if (!confirm(`Strip ${jailUser.value.trim()}'s roles and jail them?`)) return;
+    const time = jailTime.value.trim();
+    if (!confirm(`Strip ${jailUser.value.trim()}'s roles and jail them${time ? ` for ${time}` : ""}?`)) return;
     jailBtn.disabled = true;
-    if (await attempt(() => api(`/api/guilds/${id}/jail`, { method: "POST", body: { username: jailUser.value.trim() } }), "Member jailed")) refresh();
+    const r = await attempt(() => api(`/api/guilds/${id}/jail`, { method: "POST", body: { username: jailUser.value.trim(), duration: time } }), "Member jailed");
     jailBtn.disabled = false;
+    if (r) {
+      if (time && !r.timerPosted) toast("Jailed — but no countdown was posted. Pick a timer channel above so it has somewhere to go.", true);
+      refresh();
+    }
   };
+
+  // Jailed list with a live "time left" that ticks down every second.
+  const countdowns = [];
+  const jailedList = jail.jailed.length
+    ? h("ul", { class: "list" }, jail.jailed.map((j) => {
+        const left = h("div", { class: "muted small" }, j.until ? "" : "No timer — jailed until someone unjails them");
+        if (j.until) countdowns.push({ el: left, until: j.until });
+        return h("li", null,
+          h("div", { class: "grow" }, h("div", null, j.name), left),
+          h("button", { class: "btn ghost sm", type: "button", onclick: async () => {
+            if (!confirm(`Unjail ${j.name} and restore their old roles?`)) return;
+            if (await attempt(() => api(`/api/guilds/${id}/unjail`, { method: "POST", body: { userId: j.id } }), "Unjailed")) refresh();
+          } }, "Unjail"));
+      }))
+    : h("p", { class: "empty" }, "Nobody is jailed.");
+  if (countdowns.length) {
+    const tickCountdowns = () => {
+      for (const c of countdowns) {
+        const ms = c.until - Date.now();
+        c.el.textContent = ms > 0 ? `⏱ ${fmtLeft(ms)} left` : "⏱ Time's up — releasing…";
+      }
+    };
+    tickCountdowns();
+    const timer = setInterval(() => {
+      if (!document.body.contains(jailedList)) return clearInterval(timer); // stop once you leave the page
+      tickCountdowns();
+    }, 1000);
+  }
 
   body.append(
     h("div", { class: "grid-2" },
@@ -974,13 +990,18 @@ async function renderModeration(body, id, d, refresh) {
         h("p", { class: "muted small", style: "margin-bottom:14px" }, "Jailing strips a member down to just the jail role. Unjailing restores whatever roles they had before."),
         h("label", { class: "field" }, h("span", null, "Jail role"), jailRoleSel),
         saveJailRole,
+        h("h3", { style: "margin-top:20px" }, "Jail timer channel"),
+        h("p", { class: "muted small", style: "margin-bottom:10px" }, "When someone is jailed for a set time (/jail @user 1m 2d 4h 2m 12s), the bot posts a live countdown here that everyone can see, including the jailed member. Pick a channel the jail role can see."),
+        h("label", { class: "field" }, h("span", null, "Channel"), timerChanSel),
+        saveTimerChan,
         h("h3", { style: "margin-top:20px" }, "DM when jailed"),
-        h("p", { class: "muted small", style: "margin-bottom:10px" }, "Sent to the member right after they're jailed. Use {server} in the text."),
+        h("p", { class: "muted small", style: "margin-bottom:10px" }, "Sent to the member right after they're jailed. Use {server} and {time} in the text."),
         h("label", { class: "field" }, h("span", null, "Message"), jailDmMessage),
         h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "GIF / image"), jailImg.box, jailImg.fileInput),
         saveJailDm,
         h("h3", { style: "margin-top:20px" }, "Jail a member"),
         h("label", { class: "field", style: "margin-top:10px" }, h("span", null, "Member"), jailUser),
+        h("label", { class: "field" }, h("span", null, "How long (optional)"), jailTime),
         jailBtn)),
     h("div", { class: "grid-2", style: "margin-top:20px" },
       h("div", { class: "panel" },
@@ -1017,15 +1038,7 @@ async function renderModeration(body, id, d, refresh) {
           : h("p", { class: "empty" }, "Nobody is banned."))),
     h("div", { class: "panel", style: "margin-top:20px" },
       h("h2", null, "Jailed members"),
-      jail.jailed.length
-        ? h("ul", { class: "list" }, jail.jailed.map((j) =>
-            h("li", null,
-              h("div", { class: "grow" }, h("div", null, j.name)),
-              h("button", { class: "btn ghost sm", type: "button", onclick: async () => {
-                if (!confirm(`Unjail ${j.name} and restore their old roles?`)) return;
-                if (await attempt(() => api(`/api/guilds/${id}/unjail`, { method: "POST", body: { userId: j.id } }), "Unjailed")) refresh();
-              } }, "Unjail"))))
-        : h("p", { class: "empty" }, "Nobody is jailed.")));
+      jailedList));
 }
 
 /* ---------- Send message (text + photos to a channel) ---------- */
@@ -1684,7 +1697,7 @@ async function renderLeveling(body, id, d) {
         "A live styled preview of the /leaderboard image — rank, avatar, name, level, and XP. Drag the icon in the header to reposition it; everything else about the header can be toggled and edited below. Hover a row to see the pop effect. Your own profile stays pinned beside the list."),
       h("div", { style: "display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start" },
         h("div", { style: "flex-shrink:0;width:180px;position:sticky;top:16px" }, lbMeCard),
-        h("div", { style: "flex-shrink:0" }, lbWrap)),
+        h("div", { style: "flex-shrink:0;max-width:100%" }, lbWrap)),
       h("h3", { style: "margin-top:26px" }, "Header"),
       h("p", { class: "muted small", style: "margin-bottom:14px" }, "Turn the icon, server name, and trailing text on or off, and edit either piece of text. {server} in the name field is swapped for your server's real name."),
       h("div", { class: "grid-2", style: "margin-bottom:14px" },
@@ -2009,6 +2022,7 @@ function route() {
 
   if (parts[0] === "login") return viewLogin(query);
   if (parts[0] === "dashboard") return viewDashboard();
+  // Any unknown section (e.g. an old bookmarked #/server/123/selfdestruct link) just falls back to General.
   if (parts[0] === "server" && parts[1]) return viewServer(parts[1], TABS.some(([k]) => k === parts[2]) ? parts[2] : "overview");
   location.hash = "#/dashboard";
 }
