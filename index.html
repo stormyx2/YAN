@@ -321,7 +321,7 @@
    ===================================================================== */
 const CONFIG = {
   // Your bot's fixed ngrok address (your free dev domain).
-  API_DEFAULT: "https://italics-crisping-pluck.ngrok-free.dev",
+  API_DEFAULT: "", // same origin: vercel.json forwards /api, /auth and /config to the bot
   // Fetched automatically from web.js's DISCORD_CLIENT_ID env var right before the
   // page first renders (see the bottom of this file) — this placeholder is only
   // used if that fetch fails for some reason (e.g. the bot is offline).
