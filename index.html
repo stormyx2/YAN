@@ -275,6 +275,37 @@
   }
   .lb-me-card .lb-avatar { width: 64px; height: 64px; }
   .lb-me-card .lb-name { font-size: 1.05rem; white-space: normal; }
+
+  /* ---------- applications ---------- */
+  .app-forms { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .app-forms .btn .count { background: var(--danger); color: #fff; border-radius: 999px; padding: 0 7px; font-size: .75rem; line-height: 1.5; }
+  .app-sub { background: #050507; border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .app-sub + .app-sub { margin-top: 12px; }
+  .app-sub-head { display: flex; align-items: center; gap: 12px; }
+  .app-sub-head .ava { width: 48px; height: 48px; font-size: 1.2rem; }
+  .app-sub-head .who { flex: 1; min-width: 0; }
+  .app-sub-head .who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-ago { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .app-qa { margin: 14px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .app-qa .q { font-weight: 700; font-size: .92rem; }
+  .app-qa .a { color: #d6d6dd; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .95rem; }
+  .chip.pending { color: var(--focus); border-color: var(--focus); }
+  .chip.accepted { color: var(--ok); border-color: var(--ok); }
+  .chip.rejected { color: var(--danger); border-color: var(--danger); }
+  .q-row { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 10px; background: #050507; }
+  .q-row label.field { margin-bottom: 10px; }
+  .emb-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+  .emb-editor > .dc-preview { position: sticky; top: 16px; }
+  @media (max-width: 1000px) { .emb-editor { grid-template-columns: 1fr; } .emb-editor > .dc-preview { position: static; } }
+  .dc-preview { background: #313338; border-radius: 10px; padding: 14px; font-family: 'Noto Sans', sans-serif; }
+  .dc-preview .lbl { color: #b5bac1; font-size: .75rem; font-weight: 700; letter-spacing: .04em; margin-bottom: 8px; }
+  .dc-embed { display: flex; background: #2b2d31; border-radius: 4px; overflow: hidden; font-size: .9rem; }
+  .dc-embed .bar { width: 4px; flex: none; }
+  .dc-embed .inner { padding: 10px 14px 14px; min-width: 0; flex: 1; }
+  .dc-embed .t { font-weight: 700; color: #f2f3f5; margin-bottom: 4px; overflow-wrap: anywhere; }
+  .dc-embed .d { color: #dbdee1; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .dc-embed img { display: block; max-width: 100%; max-height: 260px; border-radius: 4px; margin-top: 10px; }
+  .dc-btn { display: inline-block; margin-top: 8px; padding: 6px 16px; border-radius: 4px; color: #fff; font-size: .85rem; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -358,6 +389,14 @@ const ERRORS = {
   no_mappings: "Add at least one emoji → role mapping first.",
   invalid_emoji: "That emoji didn't look right. Paste a real emoji, or a custom emoji copied from Discord.",
   duplicate_emoji: "You used the same emoji twice — each emoji can only map to one role.",
+  form_not_found: "That application form no longer exists.",
+  too_many_forms: "You've reached the limit of 10 application forms.",
+  too_many_questions: "An application can have up to 20 questions.",
+  no_questions: "Add at least one question first.",
+  question_missing_label: "Every question needs text (45 characters max — that's Discord's limit).",
+  application_not_found: "That application no longer exists.",
+  already_decided: "Someone already accepted or rejected that application.",
+  error_413: "That's too much to upload at once. Save after adding each GIF, or use smaller files.",
 };
 const errText = (code) => ERRORS[code] || `Something went wrong (${code}).`;
 
@@ -421,6 +460,7 @@ const ICON_PATHS = {
   leveling: '<path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/>',
   verify: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>',
   selfroles: '<circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M16 3.13a4 4 0 0 1 0 7.75M21 21v-2a4 4 0 0 0-3-3.85"/>',
+  applications: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h4"/>',
   chevron: '<path d="M9 18l6-6-6-6"/>',
 };
 function icon(name, cls = "side-ico") {
@@ -715,7 +755,7 @@ function failView(e) {
 // Sidebar sections, Wick-style: grouped under small headings, one row each.
 const TAB_GROUPS = [
   ["Moderation Settings", [["overview", "General"], ["moderation", "Moderation"], ["whitelist", "Whitelist"]]],
-  ["General Settings", [["say", "Send message"], ["autoreply", "Auto Reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"], ["selfroles", "Self Roles"]]],
+  ["General Settings", [["say", "Send message"], ["autoreply", "Auto Reply"], ["welcome", "Welcome"], ["leveling", "Leveling"], ["verify", "Verification"], ["selfroles", "Self Roles"], ["applications", "Applications"]]],
 ];
 const TABS = TAB_GROUPS.flatMap(([, items]) => items);
 
@@ -761,6 +801,7 @@ async function viewServer(id, tab = "overview") {
   else if (tab === "verify") await renderVerification(body, id, data);
   else if (tab === "selfroles") await renderSelfRoles(body, id, data);
   else if (tab === "whitelist") await renderWhitelist(body, id, data);
+  else if (tab === "applications") await renderApplications(body, id, data);
 }
 
 function channelSelect(names, current, noneLabel) {
@@ -2008,6 +2049,381 @@ async function renderWhitelist(body, id, d) {
       h("h2", null, "Dashboard link"),
       h("p", { class: "muted small", style: "margin-bottom:14px" }, "Anyone allowed to use YAN gets this link when they type /dashboard in Discord."),
       h("span", { class: "chip" }, dashUrl)));
+}
+
+/* ---------- Applications ---------- */
+// Remembers which form is open and which filters are picked while you move around the tab.
+const appUi = {}; // guildId -> { formId, status, filterForm }
+const DC_BUTTON_COLORS = { primary: "#5865f2", success: "#248046", secondary: "#4e5058", danger: "#da373c" };
+
+// Title + text + colour + GIF editor with a live Discord-style preview. Used for the apply panel
+// and for the accepted / rejected DMs. `button` ({ label, style } inputs) adds the button to the preview.
+function appEmbedEditor(cfg, { vars, button, extra } = {}) {
+  const title = h("input", { type: "text", maxlength: "256", placeholder: "Title" });
+  title.value = cfg.title || "";
+  const desc = h("textarea", { maxlength: "4000", placeholder: "Text shown in the embed", style: "min-height:120px" });
+  desc.value = cfg.description || "";
+  const color = h("input", { type: "color", value: /^#[0-9a-f]{6}$/i.test(cfg.color || "") ? cfg.color : "#5865f2" });
+
+  let image; // undefined = keep saved GIF, null = remove it, dataUrl = replace it
+  let previewSrc = cfg.imageDataUrl || null;
+  const fileInput = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true });
+  const imgBox = h("div");
+
+  const pvBar = h("div", { class: "bar" });
+  const pvTitle = h("div", { class: "t" });
+  const pvDesc = h("div", { class: "d" });
+  const pvImg = h("img", { alt: "" });
+  const pvBtn = button ? h("span", { class: "dc-btn" }) : null;
+  const preview = h("div", { class: "dc-preview" },
+    h("div", { class: "lbl" }, "PREVIEW"),
+    h("div", { class: "dc-embed" }, pvBar, h("div", { class: "inner" }, pvTitle, pvDesc, pvImg)),
+    pvBtn);
+
+  const fill = (s) => { let o = s || ""; for (const [k, v] of Object.entries(vars || {})) o = o.replaceAll(`{${k}}`, v); return o; };
+  const update = () => {
+    pvBar.style.background = color.value;
+    pvTitle.textContent = fill(title.value);
+    pvTitle.hidden = !title.value.trim();
+    pvDesc.textContent = fill(desc.value);
+    pvDesc.hidden = !desc.value.trim();
+    pvImg.hidden = !previewSrc;
+    if (previewSrc) pvImg.src = previewSrc;
+    if (pvBtn) {
+      pvBtn.textContent = button.label.value.trim() || "Apply";
+      pvBtn.style.background = DC_BUTTON_COLORS[button.style.value] || DC_BUTTON_COLORS.primary;
+    }
+  };
+  [title, desc, color].forEach((el) => el.addEventListener("input", update));
+  if (button) [button.label, button.style].forEach((el) => { el.addEventListener("input", update); el.addEventListener("change", update); });
+
+  const drawImg = () => {
+    if (previewSrc) {
+      imgBox.replaceChildren(h("div", { class: "toggle-row" },
+        h("span", null, typeof image === "string" ? "New GIF ready — save to use it" : "Using a GIF / image"),
+        h("button", { class: "btn danger sm", type: "button", onclick: () => {
+          image = cfg.hasImage ? null : undefined;
+          previewSrc = null;
+          drawImg(); update();
+        } }, "Remove")));
+    } else {
+      imgBox.replaceChildren(h("div", { class: "drop", tabindex: "0", role: "button", onclick: () => fileInput.click(),
+        onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); fileInput.click(); } } },
+        h("strong", null, "Click to add a GIF or image"),
+        h("span", { class: "muted small" }, "Shows inside the embed · GIF, PNG, JPG or WEBP · maximum 5MB")));
+    }
+  };
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files[0];
+    fileInput.value = "";
+    if (!f) return;
+    if (!/^image\/(png|jpe?g|gif|webp)$/.test(f.type)) return toast(errText("invalid_image"), true);
+    if (f.size > 5 * 1024 * 1024) return toast(errText("file_too_large"), true);
+    const fr = new FileReader();
+    fr.onload = () => { image = fr.result; previewSrc = fr.result; drawImg(); update(); };
+    fr.readAsDataURL(f);
+  });
+  drawImg();
+  update();
+
+  const el = h("div", { class: "emb-editor" },
+    h("div", null,
+      extra,
+      h("label", { class: "field" }, h("span", null, "Title"), title),
+      h("label", { class: "field" }, h("span", null, "Text"), desc),
+      h("div", { class: "row", style: "margin-bottom:14px" }, h("span", { style: "font-weight:600" }, "Colour"), color),
+      h("div", { class: "field" }, h("span", { style: "display:block;font-weight:600;margin-bottom:6px" }, "GIF / image"), imgBox, fileInput)),
+    preview);
+  return {
+    el,
+    value: () => {
+      const v = { title: title.value, description: desc.value, color: color.value };
+      if (image !== undefined) v.image = image;
+      return v;
+    },
+  };
+}
+
+async function renderApplications(body, id, d) {
+  const ui = (appUi[id] ??= { formId: null, status: "pending", filterForm: "" });
+  let data;
+  try { data = await api(`/api/guilds/${id}/applications`); }
+  catch (e) { return failView(e); }
+  const refresh = () => viewServer(id, "applications");
+  if (!data.forms.some((f) => f.id === ui.formId)) ui.formId = data.forms[0]?.id || null;
+
+  const createBtn = h("button", { class: "btn", type: "button" }, "+ Create application");
+  createBtn.onclick = async () => {
+    const name = prompt("What's this application for? (e.g. Staff, Moderator, Partner)");
+    if (name == null) return;
+    if (!name.trim()) return toast(errText("missing_name"), true);
+    const r = await attempt(() => api(`/api/guilds/${id}/applications`, { method: "POST", body: { name } }), "Application created");
+    if (r) { ui.formId = r.id; refresh(); }
+  };
+
+  // ---- Received applications ----
+  const statusSel = h("select", null, [["pending", "Waiting for review"], ["accepted", "Accepted"], ["rejected", "Rejected"], ["all", "All"]].map(([v, l]) => h("option", { value: v }, l)));
+  statusSel.value = ui.status;
+  const formSel = h("select", null, h("option", { value: "" }, "All applications"), data.forms.map((f) => h("option", { value: f.id }, f.name)));
+  formSel.value = data.forms.some((f) => f.id === ui.filterForm) ? ui.filterForm : "";
+  const subsBox = h("div");
+  let ticker = null;
+
+  async function decide(s, decision) {
+    const word = decision === "accept" ? "accepted" : "rejected";
+    if (!confirm(`${decision === "accept" ? "Accept" : "Reject"} ${s.userTag}'s ${s.formName} application? They'll be DM'd your ${word} message.`)) return;
+    const r = await attempt(() => api(`/api/guilds/${id}/applications/submissions/${s.id}/${decision}`, { method: "POST" }));
+    if (!r) return;
+    toast(r.dmSent ? `Application ${word} — ${s.userTag} was DM'd` : `Application ${word}, but ${s.userTag} has DMs closed`, !r.dmSent);
+    loadSubs();
+  }
+
+  async function loadSubs() {
+    ui.status = statusSel.value;
+    ui.filterForm = formSel.value;
+    clearInterval(ticker);
+    subsBox.replaceChildren(h("p", { class: "muted" }, "Loading applications…"));
+    let subs;
+    try { subs = await api(`/api/guilds/${id}/applications/submissions?status=${encodeURIComponent(ui.status)}&form=${encodeURIComponent(ui.filterForm)}`); }
+    catch (e) {
+      if (e.code === "not_logged_in") { location.hash = "#/login"; return; }
+      subsBox.replaceChildren(h("p", { class: "empty" }, errText(e.code)));
+      return;
+    }
+    if (!subs.length) {
+      subsBox.replaceChildren(h("div", { class: "dashed" }, ui.status === "pending" ? "No applications waiting for review." : "Nothing here yet."));
+      return;
+    }
+    const agoEls = [];
+    subsBox.replaceChildren(...subs.map((s) => {
+      const ago = h("span", { class: "app-ago" });
+      agoEls.push({ el: ago, t: s.submittedAt });
+      const footer = s.status === "pending"
+        ? h("div", { class: "row", style: "margin-top:16px" },
+            h("button", { class: "btn sm", type: "button", onclick: () => decide(s, "accept") }, "✓ Accept"),
+            h("button", { class: "btn danger sm", type: "button", onclick: () => decide(s, "reject") }, "✕ Reject"))
+        : h("p", { class: "muted small", style: "margin-top:14px" },
+            `${s.status === "accepted" ? "Accepted" : "Rejected"} by ${s.decidedBy?.name || "?"} · ${new Date(s.decidedAt).toLocaleString()}` +
+            (s.dmSent === false ? " · couldn't DM them (DMs closed)" : ""));
+      return h("div", { class: "app-sub" },
+        h("div", { class: "app-sub-head" },
+          avatar(s.userId, s.userTag, s.avatarUrl),
+          h("div", { class: "who" },
+            h("b", null, s.userTag),
+            h("div", { class: "muted small" }, `${s.formName} · submitted `, ago,
+              h("span", { title: new Date(s.submittedAt).toString() }, ` · ${new Date(s.submittedAt).toLocaleString()}`))),
+          h("span", { class: "chip " + s.status }, s.status === "pending" ? "Pending" : s.status === "accepted" ? "Accepted" : "Rejected")),
+        h("ul", { class: "app-qa" }, s.answers.map((qa, i) =>
+          h("li", null,
+            h("div", { class: "q" }, `${i + 1}. ${qa.q}`),
+            h("div", { class: "a" }, String(qa.a || "").trim() || "(no answer)")))),
+        footer);
+    }));
+    // Live "x seconds ago", ticking every second while this tab is open.
+    const tick = () => { for (const x of agoEls) x.el.textContent = Date.now() - x.t < 1000 ? "just now" : `${fmtLeft(Date.now() - x.t)} ago`; };
+    tick();
+    ticker = setInterval(() => {
+      if (!document.body.contains(subsBox)) return clearInterval(ticker);
+      tick();
+    }, 1000);
+  }
+  statusSel.onchange = loadSubs;
+  formSel.onchange = loadSubs;
+
+  const totalPending = data.forms.reduce((n, f) => n + f.pending, 0);
+  const inboxPanel = h("div", { class: "panel" },
+    h("div", { class: "row between", style: "margin-bottom:14px" },
+      h("h2", { style: "margin:0" }, "Received applications"),
+      h("span", { class: "chip pending" }, `${totalPending} waiting`)),
+    h("p", { class: "muted small", style: "margin-bottom:14px" },
+      "Everyone who applied, with their answers. Accepting or rejecting here DMs them your message and updates the post in your review channel."),
+    h("div", { class: "grid-2", style: "margin-bottom:16px" },
+      h("label", { class: "field", style: "margin:0" }, h("span", null, "Show"), statusSel),
+      h("label", { class: "field", style: "margin:0" }, h("span", null, "Application"), formSel)),
+    subsBox);
+
+  // ---- Form tabs ----
+  const formTabs = h("div", { class: "app-forms" }, data.forms.map((f) =>
+    h("button", { class: "btn sm" + (f.id === ui.formId ? "" : " ghost"), type: "button", onclick: () => { ui.formId = f.id; refresh(); } },
+      f.name, f.pending ? h("span", { class: "count" }, String(f.pending)) : null)));
+
+  body.append(
+    h("div", { class: "row between", style: "margin-bottom:18px" },
+      h("div", null,
+        h("h2", { style: "margin-bottom:4px" }, "Applications"),
+        h("p", { class: "muted" }, "Build application forms. People click a button in Discord, answer your questions, and you accept or reject them.")),
+      createBtn),
+    inboxPanel,
+    h("div", { class: "panel" },
+      h("h2", null, "Your applications"),
+      data.forms.length
+        ? [formTabs, await appFormEditor(id, d, ui.formId, refresh)]
+        : h("div", { class: "dashed" }, "No applications yet. Click “+ Create application” to make your first one (for example Staff).")));
+  loadSubs();
+}
+
+async function appFormEditor(id, d, formId, refresh) {
+  let f;
+  try { f = await api(`/api/guilds/${id}/applications/forms/${formId}`); }
+  catch (e) { return h("p", { class: "empty" }, errText(e.code)); }
+
+  const name = h("input", { type: "text", maxlength: "80" });
+  name.value = f.name;
+  const enabled = h("input", { type: "checkbox", checked: f.enabled });
+
+  // ---- Questions ----
+  const MAX_Q = 20;
+  const qs = f.questions.map((q) => ({ ...q }));
+  const qBox = h("div");
+  const addQ = h("button", { class: "btn ghost sm", type: "button" }, "+ Add question");
+  addQ.onclick = () => {
+    if (qs.length >= MAX_Q) return toast(errText("too_many_questions"), true);
+    qs.push({ label: "", placeholder: "", style: "short", required: true });
+    drawQs();
+    qBox.querySelectorAll("input[data-q]")[qs.length - 1]?.focus();
+  };
+  const drawQs = () => {
+    addQ.disabled = qs.length >= MAX_Q;
+    if (!qs.length) { qBox.replaceChildren(h("div", { class: "dashed", style: "margin-bottom:10px" }, "No questions yet — add one below.")); return; }
+    qBox.replaceChildren(...qs.map((q, i) => {
+      const label = h("input", { type: "text", maxlength: "45", placeholder: "e.g. Why do you want to be staff?", "data-q": "1" });
+      label.value = q.label;
+      const count = h("span", { class: "muted small" }, `${q.label.length}/45`);
+      label.oninput = () => { q.label = label.value; count.textContent = `${label.value.length}/45`; };
+      const ph = h("input", { type: "text", maxlength: "100", placeholder: "Hint shown inside the answer box (optional)" });
+      ph.value = q.placeholder || "";
+      ph.oninput = () => { q.placeholder = ph.value; };
+      const style = h("select", null, h("option", { value: "short" }, "Short answer (one line)"), h("option", { value: "paragraph" }, "Long answer (paragraph)"));
+      style.value = q.style === "paragraph" ? "paragraph" : "short";
+      style.onchange = () => { q.style = style.value; };
+      const req = h("input", { type: "checkbox", checked: q.required !== false });
+      req.onchange = () => { q.required = req.checked; };
+      const move = (to) => { [qs[i], qs[to]] = [qs[to], qs[i]]; drawQs(); };
+      return h("div", { class: "q-row" },
+        h("div", { class: "row between", style: "margin-bottom:10px" },
+          h("strong", null, `Question ${i + 1}`, i > 0 && i % 5 === 0 ? h("span", { class: "muted small" }, " · starts page " + (i / 5 + 1)) : null),
+          h("div", { class: "row" },
+            h("button", { class: "btn ghost sm", type: "button", "aria-label": "Move up", disabled: i === 0, onclick: () => move(i - 1) }, "↑"),
+            h("button", { class: "btn ghost sm", type: "button", "aria-label": "Move down", disabled: i === qs.length - 1, onclick: () => move(i + 1) }, "↓"),
+            h("button", { class: "btn danger sm", type: "button", onclick: () => { qs.splice(i, 1); drawQs(); } }, "Remove"))),
+        h("label", { class: "field" }, h("span", null, "Question ", count), label),
+        h("label", { class: "field" }, h("span", null, "Hint"), ph),
+        h("div", { class: "grid-2" },
+          h("label", { class: "field", style: "margin:0" }, h("span", null, "Answer type"), style),
+          h("div", { class: "toggle-row", style: "margin:0" },
+            h("div", { style: "font-weight:600" }, "Required"),
+            h("label", { class: "switch" }, req, h("i")))));
+    }));
+  };
+  drawQs();
+
+  // ---- Apply panel (embed + GIF + button) ----
+  const panelChan = channelSelect(d.text, f.panel.channel, "Select a channel");
+  const btnLabel = h("input", { type: "text", maxlength: "80", placeholder: "Apply" });
+  btnLabel.value = f.panel.buttonLabel || "Apply";
+  const btnStyle = h("select", null,
+    h("option", { value: "primary" }, "Blurple"), h("option", { value: "success" }, "Green"),
+    h("option", { value: "secondary" }, "Grey"), h("option", { value: "danger" }, "Red"));
+  btnStyle.value = f.panel.buttonStyle || "primary";
+  const panelEd = appEmbedEditor(f.panel, {
+    vars: { server: d.name, form: f.name, user: "", username: "" },
+    button: { label: btnLabel, style: btnStyle },
+    extra: [
+      h("label", { class: "field" }, h("span", null, "Channel to post in"), panelChan),
+      h("div", { class: "grid-2" },
+        h("label", { class: "field" }, h("span", null, "Button text"), btnLabel),
+        h("label", { class: "field" }, h("span", null, "Button colour"), btnStyle)),
+    ],
+  });
+
+  // ---- Where applications go ----
+  const reviewChan = channelSelect(d.text, f.reviewChannel, "Only show them here on the dashboard");
+  const reviewerRole = roleSelect(d.roles || [], f.reviewerRoleId, "Only people with Manage Server");
+
+  // ---- Accepted / rejected DMs ----
+  const dmVars = { user: "@applicant", username: "applicant", server: d.name, form: f.name };
+  const acceptEd = appEmbedEditor(f.accept, { vars: dmVars });
+  const rejectEd = appEmbedEditor(f.reject, { vars: dmVars });
+
+  const buildPayload = () => ({
+    name: name.value,
+    enabled: enabled.checked,
+    questions: qs.map((q) => ({ id: q.id, label: q.label, placeholder: q.placeholder, style: q.style, required: q.required !== false })),
+    reviewChannel: reviewChan.value,
+    reviewerRole: reviewerRole.value,
+    panel: { ...panelEd.value(), channel: panelChan.value, buttonLabel: btnLabel.value, buttonStyle: btnStyle.value },
+    accept: acceptEd.value(),
+    reject: rejectEd.value(),
+  });
+  const validate = () => {
+    if (!name.value.trim()) { toast(errText("missing_name"), true); return false; }
+    if (qs.some((q) => !q.label.trim())) { toast(errText("question_missing_label"), true); return false; }
+    return true;
+  };
+
+  const save = h("button", { class: "btn ghost", type: "button" }, "Save");
+  save.onclick = async () => {
+    if (!validate()) return;
+    save.disabled = true;
+    const ok = await attempt(() => api(`/api/guilds/${id}/applications/forms/${f.id}`, { method: "PUT", body: buildPayload() }), "Application saved");
+    save.disabled = false;
+    if (ok) refresh();
+  };
+  const post = h("button", { class: "btn", type: "button" }, f.panel.posted ? "Save & update posted message" : "Save & post to Discord");
+  post.onclick = async () => {
+    if (!validate()) return;
+    if (!panelChan.value) return toast("Pick a channel to post the apply button in first.", true);
+    if (!qs.length) return toast(errText("no_questions"), true);
+    post.disabled = true;
+    const saved = await attempt(() => api(`/api/guilds/${id}/applications/forms/${f.id}`, { method: "PUT", body: buildPayload() }));
+    const posted = saved && await attempt(() => api(`/api/guilds/${id}/applications/forms/${f.id}/post`, { method: "POST" }), `Posted in #${panelChan.value}`);
+    post.disabled = false;
+    if (posted) refresh();
+  };
+  const del = h("button", { class: "btn danger", type: "button" }, "Delete application");
+  del.onclick = async () => {
+    if (!confirm(`Delete the "${f.name}" application? Its apply button stops working and the posted message is removed. Applications people already sent stay in the list above.`)) return;
+    if (await attempt(() => api(`/api/guilds/${id}/applications/forms/${f.id}`, { method: "DELETE" }), "Application deleted")) refresh();
+  };
+
+  const section = (title, hint, ...kids) => h("div", { style: "margin-top:28px;padding-top:22px;border-top:1px solid var(--line)" },
+    h("h3", { style: "margin-bottom:6px" }, title),
+    hint && h("p", { class: "muted small", style: "margin-bottom:14px" }, hint),
+    ...kids);
+
+  return h("div", null,
+    h("div", { class: "grid-2" },
+      h("label", { class: "field" }, h("span", null, "Name"), name),
+      h("div", { class: "toggle-row", style: "align-self:end" },
+        h("div", null, h("div", { style: "font-weight:600" }, "Open for applications"), h("div", { class: "muted small" }, "Off = the button tells people it's closed")),
+        h("label", { class: "switch" }, enabled, h("i")))),
+    h("span", { class: "chip" }, f.panel.posted ? `Posted in #${f.panel.channel || "?"}` : "Not posted yet"),
+
+    section("Questions",
+      "What people answer when they click the button. Discord shows 5 questions per popup, so 6+ questions are split into pages automatically (up to 20). Questions can be 45 characters max — that's Discord's limit.",
+      qBox, addQ),
+
+    section("Apply message",
+      "The embed posted in your channel, with the button people click to apply. Use {server} and {form} in the text.",
+      panelEd.el),
+
+    section("Where applications go",
+      "Each finished application is posted here with the applicant's name, avatar, when they sent it, their answers, and Accept / Reject buttons. They also always show up in “Received applications” above.",
+      h("div", { class: "grid-2" },
+        h("label", { class: "field" }, h("span", null, "Review channel"), reviewChan),
+        h("label", { class: "field" }, h("span", null, "Who can accept / reject in Discord"), reviewerRole))),
+
+    section("Accepted message",
+      "DM'd to the applicant when you accept them. Use {user} (mention), {username}, {server} and {form}.",
+      acceptEd.el),
+
+    section("Rejected message",
+      "DM'd to the applicant when you reject them. Same placeholders: {user}, {username}, {server} and {form}.",
+      rejectEd.el),
+
+    h("div", { class: "row between", style: "margin-top:28px;padding-top:22px;border-top:1px solid var(--line)" },
+      h("div", { class: "row" }, save, post),
+      del));
 }
 
 /* =====================================================================
